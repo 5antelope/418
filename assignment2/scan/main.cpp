@@ -16,7 +16,7 @@ void usage(const char* progname) {
     printf("Usage: %s [options]\n", progname);
     printf("Program Options:\n");
     printf("  -m  --test <TYPE>      Run specified function on input.  Valid tests are: scan, find_repeats\n"); 
-    printf("  -i  --input <NAME>     Run test on given input type. Valid inputs  are: test1, random\n");
+    printf("  -i  --input <NAME>     Run test on given input type. Valid inputs are: test1, random\n");
     printf("  -n  --arraysize <INT>  Number of elements in arrays\n");
     printf("  -t  --thrust           Use Thrust library implementation\n");
     printf("  -?  --help             This message\n");
