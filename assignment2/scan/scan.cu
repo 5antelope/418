@@ -31,10 +31,9 @@ static inline int nextPow2(int n)
 __global__ void
 upsweep_kernel(int length, int stride, int* output)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int index = (blockIdx.x * blockDim.x + threadIdx.x) * 2 * stride;
 
-    if (index<length &&
-            index%(stride*2)==0) {
+    if (index + stride*2 -1 < length) {
         output[index+stride*2-1] += output[index+stride-1];
     }
 
@@ -44,10 +43,9 @@ upsweep_kernel(int length, int stride, int* output)
 __global__ void
 downsweep_kernel(int length, int stride, int* output)
 {
-    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    int index = (blockIdx.x * blockDim.x + threadIdx.x) * 2 * stride;
 
-    if (index<length &&
-            index%(stride*2)==0) {
+    if (index + stride*2 - 1< length) {
         int tmp = output[index+stride-1];
         output[index+stride-1] = output[index+stride*2-1];
         output[index+stride*2-1] += tmp;
@@ -91,7 +89,6 @@ void exclusive_scan(int* device_start, int length, int* device_result)
     for (int stride=1; stride <length; stride*=2) {
         blocks = (length + threadsPerBlock - 1) / threadsPerBlock;
         upsweep_kernel<<<blocks, threadsPerBlock>>>(length, stride, device_result);
-
     }
 
     int val = 0;
@@ -180,19 +177,6 @@ double cudaScanThrust(int* inarray, int* end, int* resultarray) {
     return overallDuration;
 }
 
-void cudaCheckArray(int length, int* device_arr) {
-    int* upsweep_temp = (int*) malloc(sizeof(int)*length);
-    cudaMemcpy(upsweep_temp, device_arr, sizeof(int)*length,
-            cudaMemcpyDeviceToHost);
-    printf("--------------------\n");
-    printf("check array in device:");
-    for (int i=0; i<length; i++) {
-        printf("[%d] = %d\n", i, upsweep_temp[i]);
-    }
-    free(upsweep_temp);
-    printf("--------------------\n");
-}
-
 int find_repeats(int *device_input, int length, int *device_output) {
     /* Finds all pairs of adjacent repeated elements in the list, storing the
      * indices of the first element of each pair (in order) into device_result.
@@ -208,8 +192,10 @@ int find_repeats(int *device_input, int length, int *device_output) {
 
     // store result of scan
     int *device_scan_array;
+    int *device_count;
 
     cudaMalloc((void **)&device_scan_array, nextPow2(length) * sizeof(int));
+    cudaMalloc((void **)&device_count, length * sizeof(int));
 
     cudaScan((int*) device_input, (int*) device_input + nextPow2(length), (int*) device_scan_array);
 
@@ -220,15 +206,11 @@ int find_repeats(int *device_input, int length, int *device_output) {
 
     find_repeats_kernal<<<blocks, threadsPerBlock>>>(device_input, device_scan_array, length, device_output);
 
-   int count = 0;
+    int count = 0;
 
     cudaMemcpy(result, device_output, length * sizeof(int), cudaMemcpyDeviceToHost);
 
-    for (int i=0; i<length; i++)
-    {
-        if (result[i]>=0)
-            count++;
-    }
+    exclusive_scan(device_scan_array, length, device_count);
 
     free(result);
     cudaFree(device_scan_array);
