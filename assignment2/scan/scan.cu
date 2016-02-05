@@ -13,7 +13,6 @@
 
 extern float toBW(int bytes, float sec);
 
-
 /* Helper function to round up to a power of 2.
  */
 static inline int nextPow2(int n)
@@ -29,26 +28,34 @@ static inline int nextPow2(int n)
 }
 
 __global__ void
-upsweep_kernel(int length, int stride, int* output)
+upsweep_kernel(int round_length, int twod, int* device_result)
 {
-    int index = (blockIdx.x * blockDim.x + threadIdx.x) * 2 * stride;
+    int twod1 = twod * 2;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
 
-    if (index + stride*2 -1 < length) {
-        output[index+stride*2-1] += output[index+stride-1];
+    if (index % twod1 != 0)
+        return;
+
+    if (index + twod1 -1 < round_length) {
+        device_result[index+twod1-1] += device_result[index+twod-1];
     }
 
     return;
 }
 
 __global__ void
-downsweep_kernel(int length, int stride, int* output)
+downsweep_kernel(int round_length, int twod, int* device_result)
 {
-    int index = (blockIdx.x * blockDim.x + threadIdx.x) * 2 * stride;
+    int twod1 = twod * 2;
 
-    if (index + stride*2 - 1< length) {
-        int tmp = output[index+stride-1];
-        output[index+stride-1] = output[index+stride*2-1];
-        output[index+stride*2-1] += tmp;
+    int index = blockIdx.x * blockDim.x + threadIdx.x;
+    if (index % twod1 != 0)
+        return;
+
+    if (index + twod1 - 1< round_length) {
+        int tmp = device_result[index+twod-1];
+        device_result[index+twod-1] = device_result[index+twod1-1];
+        device_result[index+twod1-1] += tmp;
     }
 
     return;
@@ -86,17 +93,20 @@ void exclusive_scan(int* device_start, int length, int* device_result)
     const int threadsPerBlock = 512;
     int blocks;
 
-    for (int stride=1; stride <length; stride*=2) {
+    for (int twod=1; twod <length; twod*=2) {
         blocks = (length + threadsPerBlock - 1) / threadsPerBlock;
-        upsweep_kernel<<<blocks, threadsPerBlock>>>(length, stride, device_result);
+        upsweep_kernel<<<blocks, threadsPerBlock>>>(length, twod, device_result);
+    }
+    cudaError_t err = cudaPeekAtLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "WARNING UP: A CUDA error occured: code=%d, %s\n", err, cudaGetErrorString(err));
     }
 
     int val = 0;
     cudaMemcpy(&device_result[length-1], &val, sizeof(int), cudaMemcpyHostToDevice);
-
-    for (int stride=length/2; stride>=1; stride/=2) {
+    for (int twod=length/2; twod>=1; twod/=2) {
         blocks = (length + threadsPerBlock - 1) / threadsPerBlock;
-        downsweep_kernel<<<blocks, threadsPerBlock>>>(length, stride, device_result);
+        downsweep_kernel<<<blocks, threadsPerBlock>>>(length, twod, device_result);
     }
 }
 
@@ -116,10 +126,15 @@ double cudaScan(int* inarray, int* end, int* resultarray)
     // non-power-of-2 inputs.
     int rounded_length = nextPow2(end - inarray);
 
-    cudaMalloc((void **)&device_result, sizeof(int) * rounded_length);
     cudaMalloc((void **)&device_input, sizeof(int) * rounded_length);
+    cudaMalloc((void **)&device_result, sizeof(int) * rounded_length);
     cudaMemcpy(device_input, inarray, (end - inarray) * sizeof(int),
-               cudaMemcpyHostToDevice);
+                cudaMemcpyHostToDevice);
+
+    cudaError_t err = cudaPeekAtLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "WARNING COPY: A CUDA error occured: code=%d, %s\n", err, cudaGetErrorString(err));
+    }
 
     // For convenience, both the input and output vectors on the device are
     // initialized to the input values. This means that you are free to simply
@@ -127,11 +142,11 @@ double cudaScan(int* inarray, int* end, int* resultarray)
     // If you do this, you will need to keep that fact in mind when calling
     // exclusive_scan from find_repeats.
     cudaMemcpy(device_result, inarray, (end - inarray) * sizeof(int),
-               cudaMemcpyHostToDevice);
+              cudaMemcpyHostToDevice);
 
     double startTime = CycleTimer::currentSeconds();
 
-    exclusive_scan(device_input, end - inarray, device_result);
+    exclusive_scan(device_input, rounded_length, device_result);
 
     // Wait for any work left over to be completed.
     cudaThreadSynchronize();
@@ -139,7 +154,7 @@ double cudaScan(int* inarray, int* end, int* resultarray)
     double overallDuration = endTime - startTime;
 
     cudaMemcpy(resultarray, device_result, (end - inarray) * sizeof(int),
-               cudaMemcpyDeviceToHost);
+              cudaMemcpyDeviceToHost);
 
     cudaFree(device_result);
     cudaFree(device_input);
@@ -191,29 +206,29 @@ int find_repeats(int *device_input, int length, int *device_output) {
      */
 
     // store result of scan
-    int *device_scan_array;
+    int *device_sum;
     int *device_count;
 
-    cudaMalloc((void **)&device_scan_array, nextPow2(length) * sizeof(int));
+    cudaMalloc((void **)&device_sum, nextPow2(length) * sizeof(int));
     cudaMalloc((void **)&device_count, length * sizeof(int));
 
-    cudaScan((int*) device_input, (int*) device_input + nextPow2(length), (int*) device_scan_array);
+    cudaScan((int*) device_input, (int*) device_input + nextPow2(length), (int*) device_sum);
 
     const int threadsPerBlock = 512;
     int blocks = (length + threadsPerBlock - 1) / threadsPerBlock;
 
     int *result = (int *) malloc(length * sizeof(int));
 
-    find_repeats_kernal<<<blocks, threadsPerBlock>>>(device_input, device_scan_array, length, device_output);
+    find_repeats_kernal<<<blocks, threadsPerBlock>>>(device_input, device_sum, length, device_output);
 
     int count = 0;
 
     cudaMemcpy(result, device_output, length * sizeof(int), cudaMemcpyDeviceToHost);
 
-    exclusive_scan(device_scan_array, length, device_count);
+    exclusive_scan(device_sum, length, device_count);
 
     free(result);
-    cudaFree(device_scan_array);
+    cudaFree(device_sum);
 
     return count;
 }
