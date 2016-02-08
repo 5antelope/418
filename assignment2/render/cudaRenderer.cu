@@ -381,9 +381,7 @@ shadePixel(int circleIndex, float2 pixelCenter, float3 p, float4* imagePtr) {
 
 // kernelRenderCircles -- (CUDA device code)
 //
-// Each thread renders a circle.  Since there is no protection to
-// ensure order of update or mutual exclusion on the output image, the
-// resulting image will be incorrect.
+// Each thread renders a pixel.
 __global__ void kernelRenderCircles() {
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
@@ -429,6 +427,40 @@ __global__ void kernelRenderCircles() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
+// kernelRenderPixel -- (CUDA device code)
+//
+// Each thread renders a pixel.
+__global__ void kernelRenderPixel() {
+
+    int imageX = blockIdx.x * blockDim.x + threadIdx.x;
+    int imageY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    int width = cuConstRendererParams.imageWidth;
+    int height = cuConstRendererParams.imageHeight;
+
+    if ( imageX >= width || imageY >= height)
+        return;
+
+    int offset4 = 4 * (imageY * width + imageX);
+
+    float4* imgPtr =
+        (float4 *)(&cuConstRendererParams.imageData[offset4]);
+
+    float invWidth = 1.f / width;
+    float invHeight = 1.f / height;
+    float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(imageX) + 0.5f),
+            invHeight * (static_cast<float>(imageY) + 0.5f));
+
+    // atomic/order is guranteed by this sequential access to circles
+    for (int i=0; i<cuConstRendererParams.numCircles; i++)
+    {
+        float3 p =
+            *(float3*)(&cuConstRendererParams.position[3 * i]);
+        shadePixel(i, pixelCenterNorm, p, imgPtr);
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////////////
 
 CudaRenderer::CudaRenderer() {
     image = NULL;
@@ -526,7 +558,7 @@ CudaRenderer::setup() {
                "NVIDIA GTX 480, 670 or 780.\n");
         printf("---------------------------------------------------------\n");
     }
-    
+
     // By this time the scene should be loaded.  Now copy all the key
     // data structures into device memory so they are accessible to
     // CUDA kernels
@@ -651,9 +683,20 @@ void
 CudaRenderer::render() {
 
     // 256 threads per block is a healthy number
-    dim3 blockDim(256, 1);
-    dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
+    // dim3 blockDim(256, 1);
+    // number of blocks
+    // dim3 gridDim((numCircles + blockDim.x - 1) / blockDim.x);
 
-    kernelRenderCircles<<<gridDim, blockDim>>>();
+    // kernelRenderCircles<<<gridDim, blockDim>>>();
+
+    // instead of 256 directly, use 16*16 to seperate hight and width
+    // and block per grid in X-Y dimension becomes height/16 and width/16
+    dim3 blockDim(16, 16, 1);
+    dim3 gridDim(
+            ((*image).width + blockDim.x - 1) / blockDim.x,
+            ((*image).height + blockDim.y - 1) / blockDim.y
+        );
+
+    kernelRenderPixel<<<gridDim, blockDim>>>();
     cudaThreadSynchronize();
 }
