@@ -26,3 +26,7 @@
 *.exe
 *.out
 *.app
+
+# upload/download file
+download.sh
+upload.sh
