@@ -32,9 +32,10 @@ upsweep_kernel(int rounded_length, int twod, int* device_result)
 {
     int twod1 = twod * 2;
     int index = blockIdx.x * blockDim.x + threadIdx.x;
+    index = index * twod1;
 
-    if (index % twod1 != 0)
-        return;
+    // if (index % twod1 != 0)
+    //     return;
 
     if (index + twod1 -1 < rounded_length) {
         device_result[index+twod1-1] += device_result[index+twod-1];
@@ -49,8 +50,10 @@ downsweep_kernel(int rounded_length, int twod, int* device_result)
     int twod1 = twod * 2;
 
     int index = blockIdx.x * blockDim.x + threadIdx.x;
-    if (index % twod1 != 0)
-        return;
+    index = index * twod1;
+
+    // if (index % twod1 != 0)
+    //     return;
 
     if (index + twod1 - 1< rounded_length) {
         int tmp = device_result[index+twod-1];
@@ -111,11 +114,11 @@ void exclusive_scan(int* device_start, int length, int* device_result)
     //
     int rounded_length = nextPow2(length);
 
-    const int threadsPerBlock = 512;
+    const int threadsPerBlock = 256;//512;
     int blocks;
 
     for (int twod=1; twod <rounded_length; twod*=2) {
-        blocks = (rounded_length + threadsPerBlock - 1) / threadsPerBlock;
+        blocks = (rounded_length/(twod*2) + threadsPerBlock - 1) / threadsPerBlock;
         upsweep_kernel<<<blocks, threadsPerBlock>>>(rounded_length, twod, device_result);
     }
 
@@ -128,7 +131,7 @@ void exclusive_scan(int* device_start, int length, int* device_result)
     cudaMemset(device_result + rounded_length - 1, 0, sizeof(int));
 
     for (int twod=rounded_length/2; twod>=1; twod/=2) {
-        blocks = (rounded_length + threadsPerBlock - 1) / threadsPerBlock;
+        blocks = (rounded_length/(twod*2) + threadsPerBlock - 1) / threadsPerBlock;
         downsweep_kernel<<<blocks, threadsPerBlock>>>(rounded_length, twod, device_result);
     }
 }
@@ -139,6 +142,9 @@ void exclusive_scan(int* device_start, int length, int* device_result)
  */
 double cudaScan(int* inarray, int* end, int* resultarray)
 {
+    cudaFree(0);
+    cudaDeviceSynchronize();
+
     int* device_result;
     int* device_input;
     // We round the array sizes up to a power of 2, but elements after
