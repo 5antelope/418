@@ -447,14 +447,15 @@ __global__ void kernelBoxInverted(float* cudaDeviceInvertedList, float* cudaDevi
     int blocksPerRow = (width + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int blocksPerColumn = (height + BLOCK_SIZE - 1)/ BLOCK_SIZE;
 
-    if ( x > blocksPerRow || y > blocksPerColumn)
+    if ( x >= blocksPerRow || y >=  blocksPerColumn)
         return;
 
     int boxId = y * blocksPerRow + x;
 
-    // (x,y) cooridnate of the box
+    // (x,y) cooridnate of the box left-top
     int boxX = x * BLOCK_SIZE;
     int boxY = y * BLOCK_SIZE;
+
     float invWidth = 1.f / width;
     float invHeight = 1.f / height;
 
@@ -524,7 +525,7 @@ __global__ void kernelRenderPixel(float* cudaDeviceInvertedList, float* cudaDevi
     // atomic & order is guranteed by this sequential access to circles
     for (int i=0; i<count; i++)
     {
-        int circleIndex = cudaDeviceInvertedList[ circleIndexBase + i];
+        int circleIndex = cudaDeviceInvertedList[circleIndexBase + i];
 
         // position of circle
         float3 p =
@@ -790,33 +791,21 @@ CudaRenderer::render() {
 
     // instead of 256 directly, use 16*16 to seperate hight and width
     // and block per grid in X-Y dimension becomes height/16 and width/16
-
-    dim3 blockDim(16, 16, 1);
+    dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
     dim3 gridDimScale(
-            (image->width + blockDim.x - 1) / blockDim.x,
-            (image->height + blockDim.y - 1) / blockDim.y
+            (image->width/BLOCK_SIZE + blockDim.x - 1) / blockDim.x,
+            (image->height/BLOCK_SIZE + blockDim.y - 1) / blockDim.y
         );
 
+    // gridDimScale: blocks per grid
+    // blockDim    : threads per block
     kernelBoxInverted<<<gridDimScale, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
 
     cudaThreadSynchronize();
 
-    // int numBlocksX = (image->width + BLOCK_SIZE -1)/BLOCK_SIZE;
-    // int numBlocksY = (image->height + BLOCK_SIZE -1)/BLOCK_SIZE;
-    // printf("blockDimX: %d, height: %d, width: %d, numBlocksX: %d, numBlocksY: %d\n",
-    //         blockDim.x, image->width, image->height, numBlocksX, numBlocksY);
-    // int* x = (int *) malloc(sizeof(int) * numBlocksX * numBlocksY);
-
-    // cudaMemcpy(x, cudaDeviceListCount, sizeof(int) * numBlocksX * numBlocksY,
-    //         cudaMemcpyDeviceToHost);
-    // for (int i=0; i<numBlocksX*numBlocksY; i++) {
-    //     printf("%d, ", x[i]);
-    // }
-    // printf("### \n");
-
     dim3 gridDim(
-            image->width + blockDim.x - 1,
-            image->height + blockDim.y - 1
+            (image->width + blockDim.x - 1) / blockDim.x,
+            (image->height + blockDim.y - 1) / blockDim.y
         );
 
     kernelRenderPixel<<<gridDim, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
