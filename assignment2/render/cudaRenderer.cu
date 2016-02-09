@@ -456,8 +456,8 @@ __global__ void kernelBlockInverted(float* cudaDeviceInvertedList, float* cudaDe
     // TODO: clamp
     float boxL = invWidth * blockX * BLOCK_SIZE;
     float boxR = invWidth * (blockX + 1) * BLOCK_SIZE;
-    float boxT = invHeight * (blockY + 1) * BLOCK_SIZE;
-    float boxB = invHeight * blockY * BLOCK_SIZE;
+    float boxT = invHeight * blockY * BLOCK_SIZE;
+    float boxB = invHeight * (blockY + 1) * BLOCK_SIZE;
 
     int count = 0;
 
