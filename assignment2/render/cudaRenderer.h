@@ -27,6 +27,9 @@ private:
     float* cudaDeviceRadius;
     float* cudaDeviceImageData;
 
+    float* cudaDeviceInvertedList;
+    float* cudaDeviceListCount;
+
 public:
 
     CudaRenderer();
