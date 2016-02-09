@@ -3,8 +3,12 @@
 #include <getopt.h>
 #include <string>
 
+#include "CycleTimer.h"
+
 void saxpyCuda(int N, float alpha, float* x, float* y, float* result);
 void printCudaInfo();
+
+void sequential(int N, float alpha, float* x, float* y, float* result);
 
 
 // return GB/s
@@ -63,6 +67,21 @@ int main(int argc, char** argv)
 
     printCudaInfo();
 
+    //sequential
+
+    for (int i=0; i<3; i++) {
+        double startTime = CycleTimer::currentSeconds();
+        sequential(N, alpha, xarray, yarray, resultarray);
+        double endTime = CycleTimer::currentSeconds();
+        double overallDuration = endTime - startTime;
+        printf("Sequential: %.3f ms\t\t[%.3f GB/s]\n", 1000.f * overallDuration, toBW(totalBytes, overallDuration));
+    }
+
+
+
+
+
+
     for (int i=0; i<3; i++) {
       saxpyCuda(N, alpha, xarray, yarray, resultarray);
     }
@@ -73,3 +92,11 @@ int main(int argc, char** argv)
 
     return 0;
 }
+
+void sequential(int N, float alpha, float* x, float* y, float* result){
+    int i;
+    for(i=0; i< N; i++){
+        result[i]=x[i]*alpha+y[i];
+    }
+}
+

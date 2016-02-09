@@ -8,6 +8,8 @@
 
 extern float toBW(int bytes, float sec);
 
+// Kernel definition
+// Device code
 __global__ void
 saxpy_kernel(int N, float alpha, float* x, float* y, float* result) {
 
@@ -20,6 +22,7 @@ saxpy_kernel(int N, float alpha, float* x, float* y, float* result) {
     }
 }
 
+// Host code
 void
 saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultarray) {
 
@@ -41,8 +44,7 @@ saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultarray) 
     cudaMalloc((void **)&device_y, size);
     cudaMalloc((void **)&device_result, size);
 
-    // start timing after allocation of device memory
-    double startTime = CycleTimer::currentSeconds();
+
 
     //
     // TODO copy input arrays to the GPU using cudaMemcpy
@@ -50,9 +52,14 @@ saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultarray) 
     cudaMemcpy(device_x, xarray, size, cudaMemcpyHostToDevice);
     cudaMemcpy(device_y, yarray, size, cudaMemcpyHostToDevice);
 
+    // start timing after allocation of device memory
+    double startTime = CycleTimer::currentSeconds();
     // run kernel
     saxpy_kernel<<<blocks, threadsPerBlock>>>(N, alpha, device_x, device_y, device_result);
     cudaThreadSynchronize();
+    // end timing after result has been copied back into host memory
+    double endTime = CycleTimer::currentSeconds();
+
 
     //
     // TODO copy result from GPU using cudaMemcpy
@@ -62,8 +69,7 @@ saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultarray) 
     fprintf(stderr, "WARNING: A CUDA error occured: code=%d, %s\n", err, cudaGetErrorString(err));
     #endif
 
-    // end timing after result has been copied back into host memory
-    double endTime = CycleTimer::currentSeconds();
+
 
     cudaError_t errCode = cudaPeekAtLastError();
     if (errCode != cudaSuccess) {
@@ -71,7 +77,7 @@ saxpyCuda(int N, float alpha, float* xarray, float* yarray, float* resultarray) 
     }
 
     double overallDuration = endTime - startTime;
-    printf("Overall: %.3f ms\t\t[%.3f GB/s]\n", 1000.f * overallDuration, toBW(totalBytes, overallDuration));
+    printf("CUDA: %.3f ms\t\t[%.3f GB/s]\n", 1000.f * overallDuration, toBW(totalBytes, overallDuration));
 
     // TODO free memory buffers on the GPU
     cudaFree(device_x);
@@ -101,3 +107,12 @@ printCudaInfo() {
     }
     printf("---------------------------------------------------------\n");
 }
+
+
+//#ifdef DEBUG
+//    double startTime = CycleTimer::currentSeconds();
+//#endif
+//#ifdef DEBUG
+//    double endTime = CycleTimer::currentSeconds();
+//    dbg_printf("Thread %d completes! Time:[%.3f] ms\n", args->threadId, 1000*(endTime-startTime));
+//#endif
