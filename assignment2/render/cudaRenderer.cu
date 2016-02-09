@@ -435,46 +435,49 @@ __global__ void kernelRenderCircles() {
 
 ////////////////////////////////////////////////////////////////////////////////////////
 
-__global__ void kernelBlockInverted(float* cudaDeviceInvertedList, float* cudaDeviceListCount)
+__global__ void kernelBoxInverted(float* cudaDeviceInvertedList, float* cudaDeviceListCount)
 {
-    int blockX = blockIdx.x * blockDim.x + threadIdx.x;
-    int blockY = blockIdx.y * blockDim.y + threadIdx.y;
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
     short width = cuConstRendererParams.imageWidth;
     short height = cuConstRendererParams.imageHeight;
-    int numBlocksX = (width + BLOCK_SIZE -1)/BLOCK_SIZE;
-    int numBlocksY = (height + BLOCK_SIZE -1)/BLOCK_SIZE;
-    // printf("width = %hu, height = %hu\n", width, height);
-    if ( blockX >= numBlocksX || blockY >= numBlocksY)
+
+    // max number of boxes on x/y axis
+    int blocksPerRow = (width + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    int blocksPerColumn = (height + BLOCK_SIZE - 1)/ BLOCK_SIZE;
+
+    if ( x > blocksPerRow || y > blocksPerColumn)
         return;
 
-    int index = blockX * BLOCK_SIZE + blockY;
+    int boxId = y * blocksPerRow + x;
 
+    // (x,y) cooridnate of the box
+    int boxX = x * BLOCK_SIZE;
+    int boxY = y * BLOCK_SIZE;
     float invWidth = 1.f / width;
     float invHeight = 1.f / height;
 
     // TODO: clamp
-    float boxL = invWidth * blockX * BLOCK_SIZE;
-    float boxR = invWidth * (blockX + 1) * BLOCK_SIZE;
-    float boxT = invHeight * blockY * BLOCK_SIZE;
-    float boxB = invHeight * (blockY + 1) * BLOCK_SIZE;
+    float boxL = invWidth  * boxX;
+    float boxR = invWidth  * (boxX + BLOCK_SIZE);
+    float boxT = invHeight * (boxY + BLOCK_SIZE);
+    float boxB = invHeight * boxY;
 
     int count = 0;
 
     for (int i=0; i<cuConstRendererParams.numCircles; i++)
     {
-        int offset = (numBlocksX * blockY + blockX) * cuConstRendererParams.numCircles;
+        // offset for this box in 'inverted list'
+        int offset = (blocksPerRow * y + x) * cuConstRendererParams.numCircles;
 
         float3 p =
             *(float3*)(&cuConstRendererParams.position[3 * i]);
         // radius of circle
         float rad = cuConstRendererParams.radius[i];
 
-        printf("%f, %f, %f\n", p.x, p.y, boxL);
         if ( circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB) == 1 )
         {
-            // printf("ref...width: %f, height:%f\n", width, height);
-            // printf("center: %f, %f; r=%f, L:%f, R:%f, T:%f, B:%d => \n", p.x, p.y, rad, boxL, boxR, boxT, boxB);
             // cudaDeviceInvertedList keeps info about
             // which circle is contributed to the pixel as inverted list
             cudaDeviceInvertedList[offset + count] = i;
@@ -482,29 +485,26 @@ __global__ void kernelBlockInverted(float* cudaDeviceInvertedList, float* cudaDe
         }
     }
     // keep info about how many circles are
-    // contributed to this pixel
-    cudaDeviceListCount[index] = count;
-    // if (count > 0) printf("%d ... %f\n", count, cudaDeviceListCount[index]);
+    // contributed to this box
+    cudaDeviceListCount[boxId] = count;
 }
 
-// kernelRenderBlock -- (CUDA device code)
+// kernelRenderPixel -- (CUDA device code)
 //
 // Each thread renders a pixel.
-__global__ void kernelRenderBlock(float* cudaDeviceInvertedList, float* cudaDeviceListCount) {
+__global__ void kernelRenderPixel(float* cudaDeviceInvertedList, float* cudaDeviceListCount) {
     int imageX = blockIdx.x * blockDim.x + threadIdx.x;
     int imageY = blockIdx.y * blockDim.y + threadIdx.y;
 
     short width = cuConstRendererParams.imageWidth;
     short height = cuConstRendererParams.imageHeight;
 
-    if ( imageX >= width || imageY >= height)
+    if ( imageX >= width || imageY >= height )
         return;
 
-    // int offset  = imageY * width + imageX;
-    int offset4 = 4 * (imageY * width + imageX);
-
+    int offset = 4 * (imageY * width + imageX);
     float4* imgPtr =
-        (float4 *)(&cuConstRendererParams.imageData[offset4]);
+        (float4 *)(&cuConstRendererParams.imageData[offset]);
 
     float invWidth = 1.f / width;
     float invHeight = 1.f / height;
@@ -512,22 +512,23 @@ __global__ void kernelRenderBlock(float* cudaDeviceInvertedList, float* cudaDevi
     float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(imageX) + 0.5f),
         invHeight * (static_cast<float>(imageY) + 0.5f));
 
-    int blockX = imageX / BLOCK_SIZE;
-    int blockY = imageY / BLOCK_SIZE;
-    int numBlockX = (width + BLOCK_SIZE - 1) / BLOCK_SIZE;
-    int blockIndex = blockX * numBlockX + blockY;
-    int count = cudaDeviceListCount[blockIndex];
+    int blocksPerRow = (width + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    int boxX = imageX / BLOCK_SIZE;
+    int boxY = imageY / BLOCK_SIZE;
+    int boxId = boxY * blocksPerRow + boxX;
 
-    // atomic/order is guranteed by this sequential access to circles
+    int count = cudaDeviceListCount[boxId];
+
+    int circleIndexBase = boxId * cuConstRendererParams.numCircles;
+
+    // atomic & order is guranteed by this sequential access to circles
     for (int i=0; i<count; i++)
     {
-        int circleIndexBase = blockIndex * cuConstRendererParams.numCircles;
         int circleIndex = cudaDeviceInvertedList[ circleIndexBase + i];
 
         // position of circle
         float3 p =
             *(float3*)(&cuConstRendererParams.position[3 * circleIndex]);
-
 
         shadePixel(i, pixelCenterNorm, p, imgPtr);
     }
@@ -658,8 +659,8 @@ CudaRenderer::setup() {
     int numBlocksX = (image->width + BLOCK_SIZE -1)/BLOCK_SIZE;
     int numBlocksY = (image->height + BLOCK_SIZE -1)/BLOCK_SIZE;
 
-    cudaMalloc(&cudaDeviceInvertedList, sizeof(float) * numBlocksX * numBlocksY * numCircles);
-    cudaMalloc(&cudaDeviceListCount, sizeof(float) * numBlocksX * numBlocksY);
+    cudaMalloc(&cudaDeviceInvertedList, sizeof(int) * numBlocksX * numBlocksY * numCircles);
+    cudaMalloc(&cudaDeviceListCount, sizeof(int) * numBlocksX * numBlocksY);
 
     cudaMemcpy(cudaDevicePosition, position, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
     cudaMemcpy(cudaDeviceVelocity, velocity, sizeof(float) * 3 * numCircles, cudaMemcpyHostToDevice);
@@ -791,30 +792,34 @@ CudaRenderer::render() {
     // and block per grid in X-Y dimension becomes height/16 and width/16
 
     dim3 blockDim(16, 16, 1);
-    dim3 gridDim(
+    dim3 gridDimScale(
             (image->width + blockDim.x - 1) / blockDim.x,
             (image->height + blockDim.y - 1) / blockDim.y
         );
 
-    // float invBlock = 1.f/(blockDim.x * blockDim.y);
-    // int numBlocksX = (image->width + BLOCK_SIZE -1)/BLOCK_SIZE;
-    // int numBlocksY = (image->height + BLOCK_SIZE -1)/BLOCK_SIZE;
-
-    kernelBlockInverted<<<gridDim, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
+    kernelBoxInverted<<<gridDimScale, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
 
     cudaThreadSynchronize();
 
+    // int numBlocksX = (image->width + BLOCK_SIZE -1)/BLOCK_SIZE;
+    // int numBlocksY = (image->height + BLOCK_SIZE -1)/BLOCK_SIZE;
     // printf("blockDimX: %d, height: %d, width: %d, numBlocksX: %d, numBlocksY: %d\n",
     //         blockDim.x, image->width, image->height, numBlocksX, numBlocksY);
-    // float* x = (float *) malloc(sizeof(float) * numBlocksX * numBlocksY);
+    // int* x = (int *) malloc(sizeof(int) * numBlocksX * numBlocksY);
 
     // cudaMemcpy(x, cudaDeviceListCount, sizeof(int) * numBlocksX * numBlocksY,
     //         cudaMemcpyDeviceToHost);
     // for (int i=0; i<numBlocksX*numBlocksY; i++) {
-    //     printf("%.0f ", x[i]);
+    //     printf("%d, ", x[i]);
     // }
     // printf("### \n");
-    kernelRenderBlock<<<gridDim, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
+
+    dim3 gridDim(
+            image->width + blockDim.x - 1,
+            image->height + blockDim.y - 1
+        );
+
+    kernelRenderPixel<<<gridDim, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
 
     cudaThreadSynchronize();
 
