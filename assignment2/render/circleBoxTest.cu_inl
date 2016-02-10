@@ -40,4 +40,3 @@ circleInBox(
         return 0;
     }
 }
-
