@@ -439,7 +439,7 @@ __global__ void kernelBoxInverted(float* cudaDeviceInvertedList, float* cudaDevi
 {
     int x = blockIdx.x * blockDim.x + threadIdx.x;
     int y = blockIdx.y * blockDim.y + threadIdx.y;
-
+    // printf("x=%d, y=%d, threadIdx.x=%d, threadIdx.y=%d\n", x, y, threadIdx.x, threadIdx.y);
     short width = cuConstRendererParams.imageWidth;
     short height = cuConstRendererParams.imageHeight;
 
@@ -447,11 +447,12 @@ __global__ void kernelBoxInverted(float* cudaDeviceInvertedList, float* cudaDevi
     int blocksPerRow = (width + BLOCK_SIZE - 1) / BLOCK_SIZE;
     int blocksPerColumn = (height + BLOCK_SIZE - 1)/ BLOCK_SIZE;
 
-    if ( x >= blocksPerRow || y >=  blocksPerColumn)
+    if ( x >= blocksPerRow || y >=  blocksPerColumn) {
+        printf("EXCEED\n");
         return;
+    }
 
     int boxId = y * blocksPerRow + x;
-
     // (x,y) cooridnate of the box left-top
     int boxX = x * BLOCK_SIZE;
     int boxY = y * BLOCK_SIZE;
@@ -500,8 +501,10 @@ __global__ void kernelRenderPixel(float* cudaDeviceInvertedList, float* cudaDevi
     short width = cuConstRendererParams.imageWidth;
     short height = cuConstRendererParams.imageHeight;
 
-    if ( imageX >= width || imageY >= height )
+    if ( imageX >= width || imageY >= height ) {
+        printf("EXCEED\n");
         return;
+    }
 
     int offset = 4 * (imageY * width + imageX);
     float4* imgPtr =
@@ -526,12 +529,11 @@ __global__ void kernelRenderPixel(float* cudaDeviceInvertedList, float* cudaDevi
     for (int i=0; i<count; i++)
     {
         int circleIndex = cudaDeviceInvertedList[circleIndexBase + i];
-
         // position of circle
         float3 p =
             *(float3*)(&cuConstRendererParams.position[3 * circleIndex]);
 
-        shadePixel(i, pixelCenterNorm, p, imgPtr);
+        shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
     }
 }
 
@@ -792,6 +794,7 @@ CudaRenderer::render() {
     // instead of 256 directly, use 16*16 to seperate hight and width
     // and block per grid in X-Y dimension becomes height/16 and width/16
     dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
+
     dim3 gridDimScale(
             (image->width/BLOCK_SIZE + blockDim.x - 1) / blockDim.x,
             (image->height/BLOCK_SIZE + blockDim.y - 1) / blockDim.y
