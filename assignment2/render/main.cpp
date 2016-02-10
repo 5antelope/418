@@ -112,7 +112,7 @@ int main(int argc, char** argv)
         sceneName = BIG_LITTLE;
     } else if (sceneNameStr.compare("littlebig") == 0) {
         sceneName = LITTLE_BIG;
-    } else if (sceneNameStr.compare("bouncingballs") == 0) {
+    } else if (sceneNameStr.compare("bouncing") == 0) {
         sceneName = BOUNCING_BALLS;  
     } else if (sceneNameStr.compare("hypnosis") == 0) { 
         sceneName = HYPNOSIS;           
