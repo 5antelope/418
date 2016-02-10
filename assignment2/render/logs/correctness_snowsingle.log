@@ -1,0 +1,29 @@
+Rendering to 768x768 image
+Loaded data for 100000 circles from snow.par
+Loaded scene with 100000 circles
+Loaded data for 100000 circles from snow.par
+Loaded scene with 100000 circles
+---------------------------------------------------------
+Initializing CUDA for CudaRenderer
+Found 2 CUDA devices
+Device 0: GeForce GTX 650
+   SMs:        2
+   Global mem: 1024 MB
+   CUDA Cap:   3.0
+Device 1: Quadro NVS 295
+   SMs:        1
+   Global mem: 255 MB
+   CUDA Cap:   1.1
+---------------------------------------------------------
+WARNING: You're not running on a fast GPU, please consider using NVIDIA GTX 480, 670 or 780.
+---------------------------------------------------------
+
+Running benchmark, 1 frames, beginning at frame 0 ...
+Copying image data from device
+***************** Correctness check passed **************************
+Clear:    0.5126 ms
+Advance:  0.0010 ms
+Render:   7907.3828 ms
+Total:    7907.8965 ms
+
+Overall:  8.4622 sec (note units are seconds)
