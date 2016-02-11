@@ -1,0 +1,27 @@
+Rendering to 768x768 image
+Loaded scene with 100000 circles
+Loaded scene with 100000 circles
+---------------------------------------------------------
+Initializing CUDA for CudaRenderer
+Found 2 CUDA devices
+Device 0: GeForce GTX 680
+   SMs:        8
+   Global mem: 2048 MB
+   CUDA Cap:   3.0
+Device 1: Quadro NVS 295
+   SMs:        1
+   Global mem: 255 MB
+   CUDA Cap:   1.1
+---------------------------------------------------------
+WARNING: You're not running on a fast GPU, please consider using NVIDIA GTX 480, 670 or 780.
+---------------------------------------------------------
+
+Running benchmark, 1 frames, beginning at frame 0 ...
+Copying image data from device
+***************** Correctness check passed **************************
+Clear:    0.3707 ms
+Advance:  0.0010 ms
+Render:   3844.6007 ms
+Total:    3844.9724 ms
+
+Overall:  7.6589 sec (note units are seconds)
