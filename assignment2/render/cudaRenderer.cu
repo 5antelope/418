@@ -494,6 +494,91 @@ __global__ void kernelBoxInverted(float* cudaDeviceInvertedList, float* cudaDevi
 // kernelRenderPixel -- (CUDA device code)
 //
 // Each thread renders a pixel.
+#ifdef DEV
+__global__ void kernelRenderPixel() {
+    int imageX = blockIdx.x * blockDim.x + threadIdx.x;
+    int imageY = blockIdx.y * blockDim.y + threadIdx.y;
+
+    short width = cuConstRendererParams.imageWidth;
+    short height = cuConstRendererParams.imageHeight;
+
+    if ( imageX >= width || imageY >= height ) {
+        printf("EXCEED\n");
+        return;
+    }
+
+    int blocksPerRow = (width + BLOCK_SIZE - 1) / BLOCK_SIZE;
+    // int boxX = imageX;
+    // int boxY = imageY;
+    int boxId = imageY/BLOCK_SIZE * blocksPerRow + imageX/BLOCK_SIZE;
+
+    float invWidth = 1.f / width;
+    float invHeight = 1.f / height;
+
+    __shared__ int count[1];
+    __shared__ int cuList[10000];
+
+    if ( threadIdx.x == 0 && threadIdx.y == 0)
+    {
+        //TODO: operate on box
+        float boxL = invWidth  * imageX;
+        float boxR = invWidth  * (imageX + BLOCK_SIZE);
+        float boxT = invHeight * (imageY + BLOCK_SIZE);
+        float boxB = invHeight * imageY;
+        // printf("%d, %d -> %d, %d -> %d -> %f, %f, %f, %f\n", imageX, imageY, boxId, boxL, boxR, boxT, boxB);
+        // int offset = (blocksPerRow * boxY + boxX) * cuConstRendererParams.numCircles;
+        int num = 0;
+        for (int i=0; i<cuConstRendererParams.numCircles; i++)
+        {
+            // offset for this box in 'inverted list'
+            // int offset = (blocksPerRow * boxY + boxX) * cuConstRendererParams.numCircles;
+
+            float3 p =
+                *(float3*)(&cuConstRendererParams.position[3 * i]);
+            // radius of circle
+            float rad = cuConstRendererParams.radius[i];
+
+            if ( circleInBox(p.x, p.y, rad, boxL, boxR, boxT, boxB) == 1 )
+            {
+                // cudaDeviceInvertedList keeps info about
+                // which circle is contributed to the pixel as inverted list
+                // cudaDeviceInvertedList[offset + count] = i;
+                cuList[num] = i;
+                num++;
+                // printf("asdfasdf\n");
+            }
+        }
+        // if (num==3) printf("%d ####\n", num);
+        count[0] = num;
+    }
+
+    __syncthreads();
+
+    // render pixel start from here ////////////////////////////
+    int offset = 4 * (imageY * width + imageX);
+    float4* imgPtr =
+        (float4 *)(&cuConstRendererParams.imageData[offset]);
+
+    float2 pixelCenterNorm = make_float2(invWidth * (static_cast<float>(imageX) + 0.5f),
+        invHeight * (static_cast<float>(imageY) + 0.5f));
+
+    int circleCount = count[0];
+    // if (circleCount>0) printf("count = %d\n", count);
+    // int circleIndexBase = boxId * (1 + cuConstRendererParams.numCircles);
+
+    // atomic & order is guranteed by this sequential access to circles
+    for (int i=0; i<circleCount; i++)
+    {
+        // int circleIndex = cudaDeviceInvertedList[circleIndexBase + i +1];
+        int circleIndex = cuList[i];
+        // position of circle
+        float3 p =
+            *(float3*)(&cuConstRendererParams.position[3 * circleIndex]);
+
+        shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
+    }
+}
+#else
 __global__ void kernelRenderPixel(float* cudaDeviceInvertedList, float* cudaDeviceListCount) {
     int imageX = blockIdx.x * blockDim.x + threadIdx.x;
     int imageY = blockIdx.y * blockDim.y + threadIdx.y;
@@ -536,7 +621,7 @@ __global__ void kernelRenderPixel(float* cudaDeviceInvertedList, float* cudaDevi
         shadePixel(circleIndex, pixelCenterNorm, p, imgPtr);
     }
 }
-
+#endif
 ////////////////////////////////////////////////////////////////////////////////////////
 
 CudaRenderer::CudaRenderer() {
@@ -793,6 +878,21 @@ CudaRenderer::render() {
 
     // instead of 256 directly, use 16*16 to seperate hight and width
     // and block per grid in X-Y dimension becomes height/16 and width/16
+#ifdef DEV
+    dim3 gridDim(
+            (image->width + blockDim.x - 1) / blockDim.x,
+            (image->height + blockDim.y - 1) / blockDim.y
+        );
+
+    kernelRenderPixel<<<gridDim, blockDim>>>();
+
+    cudaError_t err = cudaPeekAtLastError();
+    if (err != cudaSuccess) {
+        fprintf(stderr, "WARNING COPY: A CUDA error occured: code=%d, %s\n",
+                err, cudaGetErrorString(err));
+    }
+    cudaThreadSynchronize();
+#else    
     dim3 blockDim(BLOCK_SIZE, BLOCK_SIZE, 1);
 
     dim3 gridDimScale(
@@ -814,5 +914,5 @@ CudaRenderer::render() {
     kernelRenderPixel<<<gridDim, blockDim>>>(cudaDeviceInvertedList, cudaDeviceListCount);
 
     cudaThreadSynchronize();
-
+#endif
 }
