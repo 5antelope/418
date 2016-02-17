@@ -62,6 +62,7 @@ template <class F>
 VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
+
   return NULL;
 }
 
