@@ -17,22 +17,51 @@
 VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 {
   // TODO: Implement
-  return NULL;
+  VertexSet vertexSet;
+  vertexSet.size = capacity;
+  vertexSet.numNodes = numNodes;
+  vertexSet.type = type;
+
+  // TODO: is array the best choice here?
+  // not every efficient in add/delete operation
+  Vertex array[capacity] = {-1};
+  vertexSet.vertices = array;// (Vertex*)malloc(sizeof(Vertex) * capacity);
+
+  return vertexSet;
 }
 
 void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
+  free((Vertex*)(set->vertices));
+  delete set;
 }
 
 void addVertex(VertexSet *set, Vertex v)
+// void addVertex(VertexSet *set, Vertex v, int k)
 {
   // TODO: Implement
+  int i = 0;
+  for (; i<set.size; i++)
+  {
+  	if (set.vertices[i]==-1)
+  		break;
+  }
+  set.vertices[i] = v;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
+  for (int i=0; i<set.size; i++)
+  {
+  	if (set.vertices[i]==v)
+  	{
+  		set.vertices[i] = -1;
+  		break;
+  	}
+
+  }
 }
 
 /**
