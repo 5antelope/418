@@ -24,8 +24,8 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 
   // TODO: is array the best choice here?
   // not every efficient in add/delete operation
-  Vertex array[capacity] = {-1};
-  vertexSet.vertices = array;// (Vertex*)malloc(sizeof(Vertex) * capacity);
+  vertexSet.vertices = (Vertex*)malloc(sizeof(Vertex) * capacity);
+  memset (vertexSet.vertices, -1 , capacity);
 
   return vertexSet;
 }
