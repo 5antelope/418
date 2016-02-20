@@ -105,11 +105,11 @@ bool compareArraysAndRadiiEst(Graph graph, T* ref, T* stu)
         if (ref[i] > refMaxVal)
                 refMaxVal = ref[i];
   }
- 
+
   if (refMaxVal != stuMaxVal) {
 	std::cerr << "*** Radius estimates differ. Expected: " << refMaxVal << " Got: " << stuMaxVal << std::endl;
 	isCorrect = false;
-  }   
+  }
   return isCorrect;
 }
 

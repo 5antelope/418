@@ -2,15 +2,17 @@
 #define __VERTEX_SET__
 
 #include "graph.h"
+#include <unordered_set>
 
 typedef enum {
   SPARSE,
+  DENSE,
 } VertexSetType;
 
 typedef struct {
   int size;     // Number of nodes in the set
   int numNodes; // Number of nodes in the graph
-  VertexSetType type; 
+  VertexSetType type;
   Vertex* vertices;
 } VertexSet;
 

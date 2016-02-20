@@ -6,10 +6,11 @@
 #include <stdio.h>
 #include "mic.h"
 
+#include <omp.h>
 /**
  * Creates an empty VertexSet with the given type and capacity.
  * numNodes is the total number of nodes in the graph.
- * 
+ *
  * Student may interpret type however they wish.  It may be helpful to
  * use different representations of VertexSets under different
  * conditions, and they different conditions can be indicated by 'type'
@@ -17,15 +18,12 @@
 VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 {
   // TODO: Implement
-  VertexSet vertexSet;
-  vertexSet.size = capacity;
-  vertexSet.numNodes = numNodes;
-  vertexSet.type = type;
+  VertexSet *vertexSet = new VertexSet();
+  vertexSet->size = 0;
+  vertexSet->numNodes = numNodes;
+  vertexSet->type = type;
 
-  // TODO: is array the best choice here?
-  // not every efficient in add/delete operation
-  vertexSet.vertices = (Vertex*)malloc(sizeof(Vertex) * capacity);
-  memset (vertexSet.vertices, -1 , capacity);
+  vertexSet->vertices = (Vertex *)malloc(capacity * sizeof(Vertex));
 
   return vertexSet;
 }
@@ -33,35 +31,39 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
-  free((Vertex*)(set->vertices));
+  free(set->vertices);
   delete set;
 }
 
 void addVertex(VertexSet *set, Vertex v)
-// void addVertex(VertexSet *set, Vertex v, int k)
 {
   // TODO: Implement
-  int i = 0;
-  for (; i<set.size; i++)
+
+  // check duplication
+  for (int i=0; i<set->size; i++)
   {
-  	if (set.vertices[i]==-1)
-  		break;
+    if (set->vertices[i] == v)
+        return;
   }
-  set.vertices[i] = v;
+
+  set->vertices[set->size] = v;
+  set->size = set->size + 1;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  for (int i=0; i<set.size; i++)
+  int i = 0;
+  for (; i < set->size; i++)
   {
-  	if (set.vertices[i]==v)
-  	{
-  		set.vertices[i] = -1;
-  		break;
-  	}
-
+    if (set->vertices[i]==v)
+        break;
   }
+
+  for (; i < set->size-1; i++)
+      set->vertices[i] = set->vertices[i+1];
+
+  set->size = set->size-1;
 }
 
 /**

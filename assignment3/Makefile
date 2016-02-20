@@ -46,3 +46,6 @@ $(OBJDIR)/%.o: %.cpp
 		$(CXX) $< $(CXXFLAGS) -c -o $@
 
 $(OBJDIR)/main.o: CycleTimer.h grade.h
+
+handin:
+	tar -cf handin.tar writeup.pdf paraGraph.h vertex_set.h vertex_set.cpp apps/*.cpp
