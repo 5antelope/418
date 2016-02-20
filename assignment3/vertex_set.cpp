@@ -22,8 +22,6 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
   vertexSet->numNodes = numNodes;
   vertexSet->type = type;
 
-  // TODO: is array the best choice here?
-  // not every efficient in add/delete operation
   vertexSet->vertices = (Vertex *)malloc(capacity * sizeof(Vertex));
 
   return vertexSet;
@@ -33,36 +31,40 @@ void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
   free(set->vertices);
-  free(set);
+  delete set;
 }
 
 void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
+
+  // check length of array
+  // int len = sizeof(set->vertices)/sizeof(set->vertices[0]);
+  // if (set->size >= len)
+  //     return;
+
+  // check duplication
   for (int i=0; i<set->size; i++)
   {
     if (set->vertices[i] == v)
-    {
         return;
-    }
   }
 
   set->vertices[set->size] = v;
   set->size = set->size + 1;
-  printf("///// size %d ////\n", set->size);
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
   int i = 0;
-  for (; i<set->size; i++)
+  for (; i < set->size; i++)
   {
     if (set->vertices[i]==v)
         break;
   }
 
-  for (; i<set->size-1; i++)
+  for (; i < set->size-1; i++)
       set->vertices[i] = set->vertices[i+1];
 
   set->size = set->size-1;

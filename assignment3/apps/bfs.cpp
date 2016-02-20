@@ -48,12 +48,12 @@ void bfs(graph *g, int *solution) {
   VertexSet *newFrontier;
 
   while (frontier->size != 0) {
-    printf("/// cur frontier size = %d///\n", frontier->size);
+    // printf("/// cur frontier size = %d///\n", frontier->size);
     newFrontier = edgeMap<Bfs>(g, frontier, f);
     freeVertexSet(frontier);
     frontier = newFrontier;
     f.currentDistance++;
-    printf("/// new frontier size = %d///\n", frontier->size);
+    // printf("/// new frontier size = %d///\n", frontier->size);
   }
 
   freeVertexSet(frontier);

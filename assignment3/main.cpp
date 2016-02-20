@@ -105,11 +105,11 @@ bool compareArraysAndRadiiEst(Graph graph, T* ref, T* stu)
         if (ref[i] > refMaxVal)
                 refMaxVal = ref[i];
   }
- 
+
   if (refMaxVal != stuMaxVal) {
 	std::cerr << "*** Radius estimates differ. Expected: " << refMaxVal << " Got: " << stuMaxVal << std::endl;
 	isCorrect = false;
-  }   
+  }
   return isCorrect;
 }
 
@@ -201,7 +201,8 @@ int main(int argc, char** argv)
   if (arguments.app == BFS || arguments.app == GRADE) {
     /* BFS */
     timingApp(timing, "BFS");
-    possiblePoints += MAX_POINTS;
+    std::cout << "/// TIMING BFS ///" << std::endl;
+    possiblePoints +=MAX_POINTS;
     points += TIME_MIC(bfs_ref, bfs, int)
       (timing, arguments.device, numTrials, min_threads, max_threads,
       compareArrays<int>, graph);

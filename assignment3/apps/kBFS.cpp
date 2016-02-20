@@ -18,7 +18,7 @@
 #define NORETURN 0
 
 
-class RadiiUpdate 
+class RadiiUpdate
 {
   public:
     int** visited;
@@ -43,7 +43,7 @@ class RadiiUpdate
         }
       }
       return changed;
-    }	
+    }
 
     bool cond(Vertex v) {
       return true;
@@ -51,12 +51,12 @@ class RadiiUpdate
 };
 
 
-class VisitedCopy 
+class VisitedCopy
 {
   public:
     int** visited;
     int** nextVisited;
-    VisitedCopy(int** visited, int** nextVisited) : 
+    VisitedCopy(int** visited, int** nextVisited) :
       visited(visited), nextVisited(nextVisited) {};
 
     bool operator()(Vertex v) {
@@ -159,9 +159,12 @@ void kBFS(graph *g, int *distField) {
   for (int i = 0; i < K; i++) 
     addVertex(ks, i);
 
+  printf("/// ready to init ///\n");
   Init i(S, visited, nextVisited, radii);
+  printf("/// inited ///\n");
   vertexMap(ks, i, NORETURN);
 
+  printf("/// called vertexMap ///\n");
   while (frontier->size > 0) {
     iter = iter + 1;
     RadiiUpdate ru(visited, nextVisited, radii, iter);
@@ -173,4 +176,5 @@ void kBFS(graph *g, int *distField) {
   freeVertexSet(frontier);
   free(visited);
   free(nextVisited);
+  printf("/// end of vertexMap ///\n");
 }
