@@ -18,7 +18,7 @@
 #define NORETURN 0
 
 
-class RadiiUpdate
+class RadiiUpdate 
 {
   public:
     int** visited;
@@ -43,7 +43,7 @@ class RadiiUpdate
         }
       }
       return changed;
-    }
+    }	
 
     bool cond(Vertex v) {
       return true;
@@ -51,12 +51,12 @@ class RadiiUpdate
 };
 
 
-class VisitedCopy
+class VisitedCopy 
 {
   public:
     int** visited;
     int** nextVisited;
-    VisitedCopy(int** visited, int** nextVisited) :
+    VisitedCopy(int** visited, int** nextVisited) : 
       visited(visited), nextVisited(nextVisited) {};
 
     bool operator()(Vertex v) {
@@ -145,36 +145,46 @@ void kBFS(graph *g, int *distField) {
 
   // initialize the frontier with K random nodes
   srand(0);
-  int S[K]; // the set of source nodes
-  for (int i = 0; i < K; i++) 
+  int numSources = std::min(K, g->num_nodes);
+  int S[numSources]; // the set of source nodes
+  for (int i = 0; i < numSources; i++) 
     S[i] = (std::rand()/(float)RAND_MAX) * g->num_nodes;
 
-  VertexSet* frontier = newVertexSet(SPARSE, K, g->num_nodes);
-  for (int i = 0; i < K; i++) {
+  VertexSet* frontier = newVertexSet(SPARSE, numSources, g->num_nodes);
+  for (int i = 0; i < numSources; i++) {
     addVertex(frontier, S[i]);
   }
 
   // iterate over values 1 thru k to do initialization
-  VertexSet* ks = newVertexSet(SPARSE, K, g->num_nodes);
-  for (int i = 0; i < K; i++) 
+  VertexSet* ks = newVertexSet(SPARSE, numSources, g->num_nodes);
+  for (int i = 0; i < numSources; i++) 
     addVertex(ks, i);
 
-  printf("/// ready to init ///\n");
   Init i(S, visited, nextVisited, radii);
-  printf("/// inited ///\n");
   vertexMap(ks, i, NORETURN);
 
-  printf("/// called vertexMap ///\n");
+  freeVertexSet(ks);
+
+  VertexSet *newFrontier;
+
   while (frontier->size > 0) {
     iter = iter + 1;
     RadiiUpdate ru(visited, nextVisited, radii, iter);
-    frontier = edgeMap(g, frontier, ru);
+    newFrontier = edgeMap(g, frontier, ru);
+
+    freeVertexSet(frontier);
+    frontier = newFrontier;
+
     VisitedCopy vc(visited, nextVisited);
     vertexMap(frontier, vc, NORETURN);
+  }
+
+  for (int i = 0; i < g->num_nodes; i++) {
+    free(visited[i]);
+    free(nextVisited[i]);
   }
 
   freeVertexSet(frontier);
   free(visited);
   free(nextVisited);
-  printf("/// end of vertexMap ///\n");
 }

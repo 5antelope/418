@@ -6,10 +6,14 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <omp.h>
+
 #include "vertex_set.h"
 #include "graph.h"
 
 #include "mic.h"
+
+#define NUM_THREADS 2
 
 /*
  * edgeMap --
@@ -38,7 +42,10 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
   int k = 0;
 
-  // #pragma omp parallel for
+  // omp_set_num_threads(NUM_THREADS);
+  // omp_set_schedule(omp_sched_dynamic, 10)
+
+  // #pragma omp parallel for reduction(+:k)
   for (int i=0; i<u->size; i++)
   {
     Vertex vertex = u->vertices[i];
@@ -93,6 +100,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
   int k = 0;
+
   // #pragma omp parallel for
   for (int i=0; i<u->size; i++)
   {

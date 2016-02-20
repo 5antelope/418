@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include "mic.h"
 
+#include <omp.h>
 /**
  * Creates an empty VertexSet with the given type and capacity.
  * numNodes is the total number of nodes in the graph.
@@ -37,11 +38,6 @@ void freeVertexSet(VertexSet *set)
 void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-
-  // check length of array
-  // int len = sizeof(set->vertices)/sizeof(set->vertices[0]);
-  // if (set->size >= len)
-  //     return;
 
   // check duplication
   for (int i=0; i<set->size; i++)
