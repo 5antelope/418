@@ -43,7 +43,10 @@ void addVertex(VertexSet *set, Vertex v)
   for (int i=0; i<set->size; i++)
   {
     if (set->vertices[i] == v)
+    {
+        assert(set->vertices[i] == v);
         return;
+    }
   }
 
   set->vertices[set->size] = v;

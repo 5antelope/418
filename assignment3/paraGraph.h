@@ -5,6 +5,7 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
+#include <unordered_set>
 
 #include <omp.h>
 
@@ -42,10 +43,14 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
   int k = 0;
 
+  int flags[g->num_nodes];
+  memset(flags, 0, g->num_nodes * sizeof(int));
+
   // omp_set_num_threads(NUM_THREADS);
   // omp_set_schedule(omp_sched_dynamic, 10)
 
   // #pragma omp parallel for reduction(+:k)
+
   for (int i=0; i<u->size; i++)
   {
     Vertex vertex = u->vertices[i];
@@ -53,8 +58,11 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
     const Vertex* end = outgoing_end(g, vertex);
     for (const Vertex* v=start; v!=end; v++)
     {
-      if (f.cond(*v))
+      if (f.cond(*v) && flags[*v]==0)
+      {
+        flags[*v] = 1;
         k++;
+      }
     }
   }
 
@@ -112,7 +120,9 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 
   if (returnSet)
   {
+      printf("HERE\n");
       set = newVertexSet(SPARSE, k, u->numNodes);
+      printf("after init, size is %d\n", k);
       for (int i=0; i<u->size; i++)
       {
         if (f(u->vertices[i]))
