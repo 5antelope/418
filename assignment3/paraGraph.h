@@ -5,17 +5,13 @@
 #include <stdbool.h>
 #include <stdlib.h>
 #include <string.h>
-#include <unordered_set>
-
-#include <omp.h>
 
 #include "vertex_set.h"
 #include "graph.h"
 
 #include "mic.h"
 
-#define NUM_THREADS 2
-
+// #define DEBUG
 /*
  * edgeMap --
  *
@@ -39,15 +35,19 @@
  * generation as these methods will be inlined.
  */
 template <class F>
-static VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
+VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
-  // omp_set_num_threads(NUM_THREADS);
-  // omp_set_schedule(omp_sched_dynamic, 10)
-
-  // #pragma omp parallel for reduction(+:k)
-
   VertexSet* set = newVertexSet(SPARSE, g->num_nodes, g->num_nodes);
   memcpy(set->flags, u->flags, sizeof(int) * g->num_nodes);
+
+#ifdef DEBUG
+    printf("FALGS: \n");
+    for (int j=0; j<g->num_nodes; j++)
+    {
+      printf("%d, ", u->flags[j]);
+    }
+    printf("\n-- ");
+#endif
 
   for (int i=0; i<g->num_nodes; i++)
   {
@@ -56,15 +56,20 @@ static VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=tru
 
     for (const Vertex* v=start; v!=end; v++)
     {
-      // TODO: HARD CODE src of update() here
-      if (u->flags[*v] == 1 && f.update(0, i))
+      if (u->flags[*v] == 1 && f.update(*v, i))
       {
+        // printf("add %d to set due to edge from %d\n", i, *v);
         addVertex(set, i);
-        break;
       }
     }
   }
-
+#ifdef DEBUG
+    for (int j=0; j<g->num_nodes; j++)
+    {
+      printf("%d, ", set->flags[j]);
+    }
+  printf("\nreturn size = %d\n", set->size);
+#endif
   return set;
 }
 
@@ -88,39 +93,10 @@ static VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=tru
  * return NULL (it need not build and create a vertex set)
  */
 template <class F>
-static VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
+VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
-  // VertexSet* set = NULL;
-
-  // if (returnSet)
-  // {
-  //     set = newVertexSet(SPARSE, u->numNodes, u->numNodes);
-  //     for (int i=0; i<u->size; i++)
-  //     {
-  //       if (f(u->vertices[i]))
-  //           addVertex(set, u->vertices[i]);
-  //     }
-  //     assert(set != NULL);
-  // }
-  // else
-  // {
-  //     int i=0;
-  //     while (i <= u->size)
-  //     {
-  //       if (!f(u->vertices[i]))
-  //       {
-  //           removeVertex(u, u->vertices[i]);
-  //       }
-  //       else
-  //       {
-  //           i++;
-  //       }
-  //     }
-  //     assert(set == NULL);
-  // }
-
- int k = 0;
+  int k = 0;
   // #pragma omp parallel for
   for (int i=0; i<u->size; i++)
   {
@@ -155,7 +131,7 @@ static VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       }
       assert(set == NULL);
   }
- 
+
   return set;
 }
 

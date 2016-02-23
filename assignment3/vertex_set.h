@@ -15,6 +15,7 @@ typedef struct {
   VertexSetType type;
   Vertex* vertices;
   int* flags;
+  int* curSetFlags;
 } VertexSet;
 
 VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes);
