@@ -1,5 +1,6 @@
 #include "vertex_set.h"
 
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <cassert>
@@ -25,6 +26,8 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 
   vertexSet->vertices = (Vertex *)malloc(capacity * sizeof(Vertex));
 
+  vertexSet->flags = (int *)calloc(numNodes, sizeof(int));
+
   return vertexSet;
 }
 
@@ -32,6 +35,7 @@ void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
   free(set->vertices);
+  free(set->flags);
   delete set;
 }
 
@@ -50,6 +54,7 @@ void addVertex(VertexSet *set, Vertex v)
   }
 
   set->vertices[set->size] = v;
+  set->flags[v] = 1;
   set->size = set->size + 1;
 }
 
@@ -66,6 +71,7 @@ void removeVertex(VertexSet *set, Vertex v)
   for (; i < set->size-1; i++)
       set->vertices[i] = set->vertices[i+1];
 
+  set->flags[v] = 0;
   set->size = set->size-1;
 }
 

@@ -41,46 +41,30 @@
 template <class F>
 VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
-  int k = 0;
-
-  int flags[g->num_nodes];
-  memset(flags, 0, g->num_nodes * sizeof(int));
-
   // omp_set_num_threads(NUM_THREADS);
   // omp_set_schedule(omp_sched_dynamic, 10)
 
   // #pragma omp parallel for reduction(+:k)
 
-  for (int i=0; i<u->size; i++)
+  VertexSet* set = newVertexSet(SPARSE, g->num_nodes, g->num_nodes);
+  memcpy(set->flags, u->flags, sizeof(int) * g->num_nodes);
+
+  for (int i=0; i<g->num_nodes; i++)
   {
-    Vertex vertex = u->vertices[i];
-    const Vertex* start = outgoing_begin(g, vertex);
-    const Vertex* end = outgoing_end(g, vertex);
+    const Vertex* start = incoming_begin(g, (Vertex)i);
+    const Vertex* end = incoming_end(g, (Vertex)i);
+
     for (const Vertex* v=start; v!=end; v++)
     {
-      if (f.cond(*v) && flags[*v]==0)
+      // TODO: HARD CODE src of update() here
+      if (u->flags[*v] == 1 && f.update(0, i))
       {
-        flags[*v] = 1;
-        k++;
+        addVertex(set, i);
+        set->flags[i] = 1;
+        break;
       }
     }
   }
-
-  VertexSet* set = newVertexSet(SPARSE, k, g->num_nodes);
-
-  for (int i=0; i<u->size; i++)
-  {
-    Vertex vertex = u->vertices[i];
-    const Vertex* start = outgoing_begin(g, vertex);
-    const Vertex* end = outgoing_end(g, vertex);
-
-    for (const Vertex* v=start; v!=end; v++)
-    {
-      if (f.update(vertex, *v))
-        addVertex(set, *v);
-    }
-  }
-
   return set;
 }
 
@@ -120,9 +104,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 
   if (returnSet)
   {
-      printf("HERE\n");
       set = newVertexSet(SPARSE, k, u->numNodes);
-      printf("after init, size is %d\n", k);
       for (int i=0; i<u->size; i++)
       {
         if (f(u->vertices[i]))
