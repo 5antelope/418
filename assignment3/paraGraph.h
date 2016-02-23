@@ -91,20 +91,11 @@ template <class F>
 VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
-  int k = 0;
-
-  // #pragma omp parallel for
-  for (int i=0; i<u->size; i++)
-  {
-    if (f(u->vertices[i]))
-      k++;
-  }
-
   VertexSet* set = NULL;
 
   if (returnSet)
   {
-      set = newVertexSet(SPARSE, k, u->numNodes);
+      set = newVertexSet(SPARSE, u->numNodes, u->numNodes);
       for (int i=0; i<u->size; i++)
       {
         if (f(u->vertices[i]))
@@ -118,10 +109,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       while (i < u->size)
       {
         if (!f(u->vertices[i]))
-        {
             removeVertex(u, u->vertices[i]);
-            k--;
-        }
         else
             i++;
       }

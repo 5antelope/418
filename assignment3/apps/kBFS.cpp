@@ -43,7 +43,7 @@ class RadiiUpdate
         }
       }
       return changed;
-    }	
+    }   
 
     bool cond(Vertex v) {
       return true;
@@ -87,8 +87,26 @@ class Init
       int bit = k % WORDSIZE;
       int word = k/WORDSIZE;
 
-      visited[v][word] |= 1 << bit;
-      nextVisited[v][word] |= 1 << bit;
+      int oldWord = visited[v][word];
+      int newWord = oldWord | 1 << bit;
+      bool success = false;
+
+      while (!success) {
+        success = __sync_bool_compare_and_swap(&visited[v][word], oldWord, newWord);
+    oldWord = visited[v][word];
+    newWord = oldWord | 1 << bit;
+      }
+
+      oldWord = nextVisited[v][word];
+      newWord = oldWord | 1 << bit;
+      success = false;
+
+      while (!success) {
+    success = __sync_bool_compare_and_swap(&nextVisited[v][word], oldWord, newWord);
+        oldWord = nextVisited[v][word];
+    newWord = oldWord | 1 << bit;
+      }
+
       radii[v] = 0;
       return false;
     }
