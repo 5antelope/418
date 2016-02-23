@@ -39,7 +39,7 @@
  * generation as these methods will be inlined.
  */
 template <class F>
-VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
+static VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
   // omp_set_num_threads(NUM_THREADS);
   // omp_set_schedule(omp_sched_dynamic, 10)
@@ -60,11 +60,11 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       if (u->flags[*v] == 1 && f.update(0, i))
       {
         addVertex(set, i);
-        set->flags[i] = 1;
         break;
       }
     }
   }
+
   return set;
 }
 
@@ -88,14 +88,51 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
  * return NULL (it need not build and create a vertex set)
  */
 template <class F>
-VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
+static VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
+  // VertexSet* set = NULL;
+
+  // if (returnSet)
+  // {
+  //     set = newVertexSet(SPARSE, u->numNodes, u->numNodes);
+  //     for (int i=0; i<u->size; i++)
+  //     {
+  //       if (f(u->vertices[i]))
+  //           addVertex(set, u->vertices[i]);
+  //     }
+  //     assert(set != NULL);
+  // }
+  // else
+  // {
+  //     int i=0;
+  //     while (i <= u->size)
+  //     {
+  //       if (!f(u->vertices[i]))
+  //       {
+  //           removeVertex(u, u->vertices[i]);
+  //       }
+  //       else
+  //       {
+  //           i++;
+  //       }
+  //     }
+  //     assert(set == NULL);
+  // }
+
+ int k = 0;
+  // #pragma omp parallel for
+  for (int i=0; i<u->size; i++)
+  {
+    if (f(u->vertices[i]))
+      k++;
+  }
+
   VertexSet* set = NULL;
 
   if (returnSet)
   {
-      set = newVertexSet(SPARSE, u->numNodes, u->numNodes);
+      set = newVertexSet(SPARSE, k, u->numNodes);
       for (int i=0; i<u->size; i++)
       {
         if (f(u->vertices[i]))
@@ -109,13 +146,16 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       while (i < u->size)
       {
         if (!f(u->vertices[i]))
+        {
             removeVertex(u, u->vertices[i]);
+            k--;
+        }
         else
             i++;
       }
       assert(set == NULL);
   }
-
+ 
   return set;
 }
 

@@ -3,7 +3,8 @@
 # Script for grading performance.
 # Performance is graded by comparing the student's best wall-clock time
 # (not speedup) after running the code in 64, 128, and 240 thread
-# configurations for bfs, kbfs, and pagerank against the reference solution.
+# configurations for bfs, kbfs, pagerank, and graph decomp against the
+# reference solution.
 
 import re
 import subprocess

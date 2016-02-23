@@ -1,28 +1,13 @@
-#include <stdlib.h>
-#include <stdio.h>
-#include <string.h>
-#include <omp.h>
-#include <bitset>
-#include <random>
-#include <math.h>
-#include <mutex> 
-#include <limits.h>
-
 #include "paraGraph.h"
-#include "mic.h"
 #include "graph.h"
-#include "graph_internal.h"
-
-#define NONE INT_MAX
-#define YESRETURN 1
-#define NORETURN 0
 
 /**
-	Given a graph, and a deltamu per node, the index with the 
-	max delta mu decomposes it into clusters. Returns for each 
-	vertex the cluster id that it belongs to.
+	Given a graph, a deltamu per node, the max deltamu value, and the id
+	of the node with the max deltamu, decompose the graph into clusters. 
+        Returns for each vertex the cluster id that it belongs to inside decomp.
 	NOTE: deltamus are given as integers, floating point differences
 	are resolved by node id order
+
 **/
-void decompose(graph *g, int *decomp, float beta) {
+void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
 }

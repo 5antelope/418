@@ -43,7 +43,7 @@ class RadiiUpdate
         }
       }
       return changed;
-    }   
+    }	
 
     bool cond(Vertex v) {
       return true;
@@ -93,8 +93,8 @@ class Init
 
       while (!success) {
         success = __sync_bool_compare_and_swap(&visited[v][word], oldWord, newWord);
-    oldWord = visited[v][word];
-    newWord = oldWord | 1 << bit;
+	oldWord = visited[v][word];
+	newWord = oldWord | 1 << bit;
       }
 
       oldWord = nextVisited[v][word];
@@ -102,9 +102,9 @@ class Init
       success = false;
 
       while (!success) {
-    success = __sync_bool_compare_and_swap(&nextVisited[v][word], oldWord, newWord);
-        oldWord = nextVisited[v][word];
-    newWord = oldWord | 1 << bit;
+	success = __sync_bool_compare_and_swap(&nextVisited[v][word], oldWord, newWord);
+    	oldWord = nextVisited[v][word];
+	newWord = oldWord | 1 << bit;
       }
 
       radii[v] = 0;

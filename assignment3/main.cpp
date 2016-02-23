@@ -1,6 +1,13 @@
 #include <stdlib.h>
 #include <stdio.h>
+#include <sstream>
 #include <iostream>
+#include <iomanip>
+#include <chrono>
+#include <type_traits>
+#include <utility>
+
+#include <float.h>
 
 #include <math.h>
 #include <omp.h>
@@ -10,7 +17,6 @@
 #include "grade.h"
 
 #include "parse_args.h"
-
 
 /* Apps */
 #include "apps/bfs.h"
@@ -29,98 +35,15 @@
 #define PageRankDampening 0.3f
 #define PageRankConvergence 0.01f
 
-#define EPSILON 0.001f
-
 // Number of trials to run benchmarks
 #define NUM_TRIALS 3
 
-template <class T>
-bool compareArrays(Graph graph, T* ref, T* stu)
-{
-  for (int i = 0; i < graph->num_nodes; i++) {
-    if (ref[i] != stu[i]) {
-      std::cerr << "*** Results disagree at " << i << " expected " 
-        << ref[i] << " found " << stu[i] << std::endl;
-      return false;
-    }
-  }
-  return true;
-}
-
-template <class T>
-bool compareApprox(Graph graph, T* ref, T* stu)
-{
-  for (int i = 0; i < graph->num_nodes; i++) {
-    if (abs(ref[i] - stu[i]) > EPSILON) {
-      std::cerr << "*** Results disagree at " << i << " expected " 
-        << ref[i] << " found " << stu[i] << std::endl;
-      return false;
-    }
-  }
-  return true;
-}
-
-template <class T>
-bool compareArraysAndDisplay(Graph graph, T* ref, T*stu) 
-{
-  printf("Visualization of results\n");
-  int grid_dim = (int)sqrt(graph->num_nodes);
-  for (int j=0; j<grid_dim; j++) {
-    for (int i=0; i<grid_dim; i++) {
-      printf("%02d ", ref[j*grid_dim + i]);
-    }
-    printf("\n");
-  }
-
-  for (int i = 0; i < graph->num_nodes; i++) {
-    if (ref[i] != stu[i]) {
-      std::cerr << "*** Results disagree at " << i << " expected "
-        << ref[i] << " found " << stu[i] << std::endl;
-      return false;
-    }
-  }
-  return true;
-}
-
-template <class T>
-bool compareArraysAndRadiiEst(Graph graph, T* ref, T* stu) 
-{
-  bool isCorrect = true;
-  for (int i = 0; i < graph->num_nodes; i++) {
-    if (ref[i] != stu[i]) {
-      std::cerr << "*** Results disagree at " << i << " expected "
-        << ref[i] << " found " << stu[i] << std::endl;
-	isCorrect = false;
-    }
-  }
-  int stuMaxVal = -1;
-  int refMaxVal = -1;
-  #pragma omp parallel for schedule(dynamic, 512) reduction(max: stuMaxVal)
-  for (int i = 0; i < graph->num_nodes; i++) {
-	if (stu[i] > stuMaxVal)
-		stuMaxVal = stu[i];
-  }
-  #pragma omp parallel for schedule(dynamic, 512) reduction(max: refMaxVal)
-  for (int i = 0; i < graph->num_nodes; i++) {
-        if (ref[i] > refMaxVal)
-                refMaxVal = ref[i];
-  }
-
-  if (refMaxVal != stuMaxVal) {
-	std::cerr << "*** Radius estimates differ. Expected: " << refMaxVal << " Got: " << stuMaxVal << std::endl;
-	isCorrect = false;
-  }
-  return isCorrect;
-}
-
+/*
+ * App wrappers
+ */
 void pageRankWrapper(Graph g, float* solution)
 {
   pageRank(g, solution, PageRankDampening, PageRankConvergence);
-}
-
-void graphDecompWrapper(Graph g, int* solution) 
-{
-  decompose(g, solution, DecompBeta); 
 }
 
 void pageRankRefWrapper (Graph g, float* solution)
@@ -128,23 +51,95 @@ void pageRankRefWrapper (Graph g, float* solution)
   pageRank_ref(g, solution, PageRankDampening, PageRankConvergence);
 }
 
+void graphDecompWrapper(Graph g, int* solution) 
+{
+  int maxVal;
+  int maxId;
+  int* dus = getDus(g->num_nodes, DecompBeta, &maxVal, &maxId);
+
+  decompose(g, solution, dus, maxVal, maxId);
+  free(dus);
+}
+
 // returns for every node, the cluster id it belongs to 
 void graphDecompRefWrapper(Graph g, int* solution) 
 {
-  decompose_ref(g, solution, DecompBeta); 
+  int maxVal;
+  int maxId;
+  int* dus = getDus_ref(g->num_nodes, DecompBeta, &maxVal, &maxId);
+
+  decompose_ref(g, solution, dus, maxVal, maxId);
+  free(dus);
 }
 
-void timingApp(std::ostream& timing, const char* appName)
-{
+/*
+ * Timing apps
+ */
+
+void gradeApps(int num_nodes, int num_edges,
+    int *outgoing_starts, int *outgoing_edges,
+    int *incoming_starts, int *incoming_edges,
+    int device, int numTrials, int minThreadCount, int maxThreadCount,
+    App app) {
+  graph g;
+
+  g.num_nodes = num_nodes;
+  g.num_edges = num_edges;
+  g.outgoing_starts = outgoing_starts;
+  g.outgoing_edges = outgoing_edges;
+  g.incoming_starts = incoming_starts;
+  g.incoming_edges = incoming_edges;
+
+  // Time apps
+  std::stringstream timing;
+
+  /* Run tests */
+  float possiblePoints = 0;
+  float points = 0;
+  if (app == BFS || app == GRADE) {
+    printTimingApp(timing, "BFS");
+    possiblePoints += 4.5;
+    points += timeApp<int, 1>(&g, device, numTrials, 4.5,
+        minThreadCount, maxThreadCount, bfs_ref, bfs,
+        compareArrays<int>, timing);
+  }
+  if (app == PAGERANK || app == GRADE) {
+    printTimingApp(timing, "PageRank");
+    possiblePoints += 4.5;
+    points += timeApp<float, 2>(&g, device, numTrials, 4.5,
+        minThreadCount, maxThreadCount, pageRankRefWrapper, pageRankWrapper,
+        compareApprox<float>, timing);
+  }
+  if (app == KBFS || app == GRADE) {
+    printTimingApp(timing, "kBFS");
+    possiblePoints += 4.5;
+    points += timeApp<int, 3>(&g, device, numTrials, 4.5,
+        minThreadCount, maxThreadCount, kBFS_ref, kBFS,
+        compareArraysAndRadiiEst<int>, timing);
+  }
+  if (app == DECOMP || app == GRADE) {
+    /* GraphDecomposition */
+    printTimingApp(timing, "Graph Decomposition");
+    // 5 total performance points for graph decomp, split between 4 graphs.
+    possiblePoints += 5.0/4;
+    points += timeApp<int, 4>(&g, device, numTrials, 5.0/4,
+        minThreadCount, maxThreadCount,
+        graphDecompRefWrapper, graphDecompWrapper,
+        compareArrays<int>, timing);
+  }
+
+  /* Timing done */
+  std::cout << std::endl << std::endl;
+  std::cout << "Grading summary:" << std::endl;
+  std::cout << timing.str();
   std::cout << std::endl;
-  std::cout << "Timing results for " << appName << ":" << std::endl;
-  sep(std::cout, '=', 75);
-
-  timing << std::endl;
-  timing << "Timing results for " << appName << ":" << std::endl;
-  sep(timing, '=', 75);
+  std::cout << "Total Grade: " << points << "/" << possiblePoints << std::endl;
+  std::cout << std::endl;
 }
 
+/*
+ * main
+ */
 
 int main(int argc, char** argv)
 {
@@ -195,47 +190,46 @@ int main(int argc, char** argv)
   std::cout << "  Edges: " << num_edges(graph) << std::endl;
 
   std::cout << std::endl;
-  std::stringstream timing;
-  float points = 0;
-  float possiblePoints = 0;
-  if (arguments.app == BFS || arguments.app == GRADE) {
-    /* BFS */
-    timingApp(timing, "BFS");
-    possiblePoints += MAX_POINTS;
-    points += TIME_MIC(bfs_ref, bfs, int)
-      (timing, arguments.device, numTrials, min_threads, max_threads,
-      compareArrays<int>, graph);
-  }
-  if (arguments.app == PAGERANK || arguments.app == GRADE) {
-    /* PageRank */
-    timingApp(timing, "PageRank");
-    possiblePoints += MAX_POINTS;
-    points += TIME_MIC(pageRankRefWrapper, pageRankWrapper, float)
-      (timing, arguments.device, numTrials, min_threads, max_threads,
-      compareApprox<float>, graph);
-  }
-  if (arguments.app == KBFS || arguments.app == GRADE) {
-    /* kBFS */
-    timingApp(timing, "kBFS");
-    possiblePoints += MAX_POINTS;
-    points += TIME_MIC(kBFS_ref, kBFS, int)
-      (timing, arguments.device, numTrials, min_threads, max_threads,
-      compareArraysAndRadiiEst<int>, graph);
-  }
-  if (arguments.app == DECOMP) {
-    /* GraphDecomposition */
-    timingApp(timing, "Graph Decomposition");
-    TIME_MIC(graphDecompRefWrapper, graphDecompWrapper, int)
-      (timing, arguments.device, numTrials, min_threads, max_threads,
-      compareArraysAndDisplay<int>, graph);
-  }
 
-  std::cout << std::endl << std::endl;
-  std::cout << "Grading summary:" << std::endl;
-  std::cout << timing.str();
-  std::cout << std::endl;
-  std::cout << "Total Grade: " << points << "/" << possiblePoints << std::endl;
-  std::cout << std::endl;
+  /* Transfer graph data to device */
+  int num_nodes = graph->num_nodes;
+  int num_edges = graph->num_edges;
+
+  int* outgoing_starts = graph->outgoing_starts;
+  int* outgoing_edges = graph->outgoing_edges;
+
+  int* incoming_starts = graph->incoming_starts;
+  int* incoming_edges = graph->incoming_edges;
+
+  #pragma offload_transfer target(mic: arguments.device) \
+        in(outgoing_starts : length(graph->num_nodes) ALLOC) \
+        in(outgoing_edges : length(graph->num_edges) ALLOC)  \
+        in(incoming_starts : length(graph->num_nodes) ALLOC) \
+        in(incoming_edges : length(graph->num_edges) ALLOC)
+
+  /* Time apps */
+  #pragma offload target(mic: arguments.device) \
+    in(numTrials) \
+    in(min_threads) \
+    in(max_threads) \
+    in(num_edges) \
+    in(num_nodes) \
+    in(arguments.app) \
+    in(arguments.device) \
+    nocopy(outgoing_starts : length(graph->num_nodes) REUSE) \
+    nocopy(outgoing_edges : length(graph->num_edges) REUSE)  \
+    nocopy(incoming_starts : length(graph->num_nodes) REUSE) \
+    nocopy(incoming_edges : length(graph->num_edges) REUSE)
+  gradeApps(num_nodes, num_edges, outgoing_starts, outgoing_edges,
+      incoming_starts, incoming_edges,
+      arguments.device, numTrials, min_threads, max_threads, arguments.app);
+
+  /* Free graph data */
+  #pragma offload_transfer target(mic: arguments.device) \
+        nocopy(outgoing_starts : length(graph->num_nodes) FREE) \
+        nocopy(outgoing_edges : length(graph->num_edges) FREE)  \
+        nocopy(incoming_starts : length(graph->num_nodes) FREE) \
+        nocopy(incoming_edges : length(graph->num_edges) FREE)
 
   free_graph(graph);
 }
