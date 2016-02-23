@@ -29,7 +29,7 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
   vertexSet->flags = (int *)calloc(numNodes, sizeof(int));
 
   vertexSet->curSetFlags = (int *)calloc(numNodes, sizeof(int));
-  memset(vertexSet->curSetFlags, -1, sizeof(int) * numNodes);
+  // memset(vertexSet->curSetFlags, -1, sizeof(int) * numNodes);
 
   return vertexSet;
 }
@@ -46,18 +46,9 @@ void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
 
-  // check duplication
-  // for (int i=0; i<set->size; i++)
-  // {
-  //   if (set->vertices[i] == v)
-  //   {
-  //       assert(set->vertices[i] == v);
-  //       return;
-  //   }
-  // }
-  if (set->curSetFlags[v] == -1)
+  if (set->curSetFlags[v] == 0)
   {
-    set->curSetFlags[v] = set->size;
+    set->curSetFlags[v] = 1;
     set->vertices[set->size] = v;
     set->size = set->size + 1;
   }
@@ -79,6 +70,7 @@ void removeVertex(VertexSet *set, Vertex v)
       set->vertices[i] = set->vertices[i+1];
 
   set->flags[v] = 0;
+  set->curSetFlags[v] = 0;
   set->size = set->size-1;
 }
 

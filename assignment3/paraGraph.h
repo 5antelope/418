@@ -40,36 +40,20 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
   VertexSet* set = newVertexSet(SPARSE, g->num_nodes, g->num_nodes);
   memcpy(set->flags, u->flags, sizeof(int) * g->num_nodes);
 
-#ifdef DEBUG
-    printf("FALGS: \n");
-    for (int j=0; j<g->num_nodes; j++)
-    {
-      printf("%d, ", u->flags[j]);
-    }
-    printf("\n-- ");
-#endif
-
-  for (int i=0; i<g->num_nodes; i++)
+  for (int vertex=0; vertex<g->num_nodes; vertex++)
   {
-    const Vertex* start = incoming_begin(g, (Vertex)i);
-    const Vertex* end = incoming_end(g, (Vertex)i);
+    const Vertex* start = incoming_begin(g, vertex);
+    const Vertex* end = incoming_end(g, vertex);
 
     for (const Vertex* v=start; v!=end; v++)
     {
-      if (u->flags[*v] == 1 && f.update(*v, i))
+      if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
       {
-        // printf("add %d to set due to edge from %d\n", i, *v);
-        addVertex(set, i);
+        addVertex(set, vertex);
       }
     }
   }
-#ifdef DEBUG
-    for (int j=0; j<g->num_nodes; j++)
-    {
-      printf("%d, ", set->flags[j]);
-    }
-  printf("\nreturn size = %d\n", set->size);
-#endif
+
   return set;
 }
 
