@@ -28,6 +28,8 @@ static struct argp_option options[] = {
   {"device",  'd',    "N",      0,  "Device number to run the code on" },
   {"threads", 't',    "N",      0,  "Number of threads to use" },
   {"check",   'c',      0,      1,  "Check for correctness (run once)" },
+  {"stu",     's',      0,      1,  "Skip student solution" },
+  {"ref",     'r',      0,      1,  "Skip reference solution" },
   { 0 }
 };
 
@@ -51,6 +53,12 @@ static error_t parse_opt (int key, char *arg, struct argp_state *state)
       break;
     case 'c':
       arguments->correctness = true;
+      break;
+    case 's':
+      arguments->runStu = false;
+      break;
+    case 'r':
+      arguments->runRef = false;
       break;
 
     case ARGP_KEY_ARG:
@@ -104,6 +112,9 @@ Arguments parseArgs(int argc, char** argv)
   arguments.device = 0;
   arguments.threads = -1;
   arguments.correctness = false;
+  // By default run both reference and student solutions.
+  arguments.runStu = true;
+  arguments.runRef = true;
 
   argp_parse(&argp, argc, argv, 0, 0, &arguments);
   return arguments;

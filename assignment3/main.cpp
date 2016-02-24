@@ -36,7 +36,7 @@
 #define PageRankConvergence 0.01f
 
 // Number of trials to run benchmarks
-#define NUM_TRIALS 3
+#define NUM_TRIALS 1
 
 /*
  * App wrappers
@@ -80,7 +80,7 @@ void gradeApps(int num_nodes, int num_edges,
     int *outgoing_starts, int *outgoing_edges,
     int *incoming_starts, int *incoming_edges,
     int device, int numTrials, int minThreadCount, int maxThreadCount,
-    App app) {
+    App app, bool runRef, bool runStu) {
   graph g;
 
   g.num_nodes = num_nodes;
@@ -99,33 +99,33 @@ void gradeApps(int num_nodes, int num_edges,
   if (app == BFS || app == GRADE) {
     printTimingApp(timing, "BFS");
     possiblePoints += 4.5;
-    points += timeApp<int, 1>(&g, device, numTrials, 4.5,
+    points += timeApp<int, BFS>(&g, device, numTrials, 4.5,
         minThreadCount, maxThreadCount, bfs_ref, bfs,
-        compareArrays<int>, timing);
+        compareArrays<int>, runRef, runStu, timing);
   }
   if (app == PAGERANK || app == GRADE) {
     printTimingApp(timing, "PageRank");
     possiblePoints += 4.5;
-    points += timeApp<float, 2>(&g, device, numTrials, 4.5,
-        minThreadCount, maxThreadCount, pageRankRefWrapper, pageRankWrapper,
-        compareApprox<float>, timing);
+    points += timeApp<float, PAGERANK>(&g, device, numTrials, 4.5,
+        minThreadCount, maxThreadCount,
+        pageRankRefWrapper, pageRankWrapper,
+        compareApprox<float>, runRef, runStu, timing);
   }
   if (app == KBFS || app == GRADE) {
     printTimingApp(timing, "kBFS");
     possiblePoints += 4.5;
-    points += timeApp<int, 3>(&g, device, numTrials, 4.5,
+    points += timeApp<int, KBFS>(&g, device, numTrials, 4.5,
         minThreadCount, maxThreadCount, kBFS_ref, kBFS,
-        compareArraysAndRadiiEst<int>, timing);
+        compareArraysAndRadiiEst<int>, runRef, runStu, timing);
   }
   if (app == DECOMP || app == GRADE) {
-    /* GraphDecomposition */
     printTimingApp(timing, "Graph Decomposition");
     // 5 total performance points for graph decomp, split between 4 graphs.
     possiblePoints += 5.0/4;
-    points += timeApp<int, 4>(&g, device, numTrials, 5.0/4,
+    points += timeApp<int, DECOMP>(&g, device, numTrials, 5.0/4,
         minThreadCount, maxThreadCount,
         graphDecompRefWrapper, graphDecompWrapper,
-        compareArrays<int>, timing);
+        compareArrays<int>, runRef, runStu, timing);
   }
 
   /* Timing done */
@@ -216,13 +216,16 @@ int main(int argc, char** argv)
     in(num_nodes) \
     in(arguments.app) \
     in(arguments.device) \
+    in(arguments.runRef) \
+    in(arguments.runStu) \
     nocopy(outgoing_starts : length(graph->num_nodes) REUSE) \
     nocopy(outgoing_edges : length(graph->num_edges) REUSE)  \
     nocopy(incoming_starts : length(graph->num_nodes) REUSE) \
     nocopy(incoming_edges : length(graph->num_edges) REUSE)
   gradeApps(num_nodes, num_edges, outgoing_starts, outgoing_edges,
       incoming_starts, incoming_edges,
-      arguments.device, numTrials, min_threads, max_threads, arguments.app);
+      arguments.device, numTrials, min_threads, max_threads, arguments.app,
+      arguments.runRef, arguments.runStu);
 
   /* Free graph data */
   #pragma offload_transfer target(mic: arguments.device) \

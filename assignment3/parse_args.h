@@ -2,7 +2,7 @@
 #define __PARSE_ARGS
 
 typedef enum {
-  BFS,
+  BFS = 0,
   PAGERANK,
   KBFS,
   DECOMP,
@@ -16,6 +16,8 @@ typedef struct
   int device;
   int threads;
   bool correctness;
+  bool runStu;
+  bool runRef;
 } Arguments;
 
 Arguments parseArgs(int argc, char** argv);

@@ -13,7 +13,7 @@ $(APP_NAME): CXXFLAGS = -I. -O3 -Wall -openmp -offload-attribute-target=mic -DRU
 
 # Compile for CPU
 cpu: CXX = g++ -m64 -std=c++11
-cpu: CXXFLAGS = -I. -O3 -Wall -fopenmp -Wno-unknown-pragmas -g
+cpu: CXXFLAGS = -I. -O3 -Wall -fopenmp -Wno-unknown-pragmas
 
 .PHONY: dirs clean jobs grade
 
