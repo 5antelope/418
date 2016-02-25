@@ -37,7 +37,7 @@
 template <class F>
 VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
-  VertexSet* set = newVertexSet(SPARSE, g->num_nodes, g->num_nodes);
+  VertexSet* set = newVertexSet(u->type, g->num_nodes, g->num_nodes);
 
   #pragma omp parallel for schedule(static)
   for (int vertex=0; vertex<g->num_nodes; vertex++)
@@ -54,12 +54,12 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
     }
   }
 
-  // int sum = 0;
-  // #pragma omp parallel for reduction(+:sum)
-  // for (int i=0; i<g->num_nodes; i++)
-  //   sum += set->curSetFlags[i];
+  int sum = 0;
+  #pragma omp parallel for reduction(+:sum)
+  for (int i=0; i<g->num_nodes; i++)
+    sum += set->curSetFlags[i];
 
-  // set->size = sum;
+  set->size = sum;
 
   return set;
 }
@@ -87,7 +87,6 @@ template <class F>
 VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
-
   VertexSet* set = NULL;
 
   if (returnSet)
@@ -109,6 +108,13 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
             removeVertex(u, i);
       }
   }
+
+  int sum = 0;
+  #pragma omp parallel for reduction(+:sum)
+  for (int i=0; i<u->numNodes; i++)
+    sum += set->curSetFlags[i];
+
+  set->size = sum;
 
   return set;
 }

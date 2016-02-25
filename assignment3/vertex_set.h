@@ -14,9 +14,10 @@ typedef struct {
   int numNodes; // Number of nodes in the graph
   VertexSetType type;
   Vertex* vertices;
-  // int* flags;
   int* curSetFlags;
 } VertexSet;
+
+VertexSetType setType(const Graph, VertexSet*);
 
 VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes);
 void freeVertexSet(VertexSet *set);

@@ -8,6 +8,24 @@
 #include "mic.h"
 
 #include <omp.h>
+
+enum VertexSetType setType(Graph g, VertexSet* set)
+{
+  int numNodes = num_nodes(g);
+  int outEdges = 0;
+  #pragma omp parallel for reduction(+:outEdges) schedule(static)
+  for (int i=0; i<set->numNodes; i++)
+  {
+    if (set->curSetFlags[i]==1)
+      outEdges += outgoing_size(g, i);
+  }
+
+  if (numNodes > outEdges)
+      return SPARSE;
+  else
+      return DENSE;
+}
+
 /**
  * Creates an empty VertexSet with the given type and capacity.
  * numNodes is the total number of nodes in the graph.
@@ -26,7 +44,10 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 
   vertexSet->vertices = (Vertex *)malloc(capacity * sizeof(Vertex));
 
-  vertexSet->curSetFlags = (int *)calloc(numNodes, sizeof(int));
+  vertexSet->curSetFlags = (int *)malloc(numNodes * sizeof(int));
+  #pragma omp parallel for
+  for (int i=0; i<numNodes; i++)
+    vertexSet->curSetFlags[i] = 0;
 
   return vertexSet;
 }
@@ -45,25 +66,15 @@ void addVertex(VertexSet *set, Vertex v)
   {
     set->curSetFlags[v] = 1;
     // set->vertices[set->size] = v;
-    set->size = set->size + 1;
+    // set->size = set->size + 1;
   }
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  // int i = 0;
-  // for (; i < set->size; i++)
-  // {
-  //   if (set->vertices[i]==v)
-  //       break;
-  // }
-
-  // for (; i < set->size-1; i++)
-  //     set->vertices[i] = set->vertices[i+1];
 
   set->curSetFlags[v] = 0;
-  set->size = set->size-1;
 }
 
 /**
