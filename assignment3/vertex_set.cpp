@@ -9,10 +9,13 @@
 
 #include <omp.h>
 
-enum VertexSetType setType(Graph g, VertexSet* set)
+VertexSetType setType(Graph g, VertexSet* set)
 {
   int numNodes = num_nodes(g);
+  int setNodes = set->size;
   int outEdges = 0;
+  int numEdges = num_edges(g);
+
   #pragma omp parallel for reduction(+:outEdges) schedule(static)
   for (int i=0; i<set->numNodes; i++)
   {
@@ -20,7 +23,7 @@ enum VertexSetType setType(Graph g, VertexSet* set)
       outEdges += outgoing_size(g, i);
   }
 
-  if (numNodes > outEdges)
+  if (setNodes/numNodes > outEdges/numEdges)
       return SPARSE;
   else
       return DENSE;

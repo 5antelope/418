@@ -37,19 +37,45 @@
 template <class F>
 VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
-  VertexSet* set = newVertexSet(u->type, g->num_nodes, g->num_nodes);
+  VertexSetType type = setType(g, u);
 
-  #pragma omp parallel for schedule(static)
-  for (int vertex=0; vertex<g->num_nodes; vertex++)
+  VertexSet* set = newVertexSet(type, g->num_nodes, g->num_nodes);
+
+  if (type == DENSE)
   {
-    const Vertex* start = incoming_begin(g, vertex);
-    const Vertex* end = incoming_end(g, vertex);
-
-    for (const Vertex* v=start; v!=end; v++)
+    #pragma omp parallel for schedule(static)
+    for (int vertex=0; vertex<g->num_nodes; vertex++)
     {
-      if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
+      const Vertex* start = incoming_begin(g, vertex);
+      const Vertex* end = incoming_end(g, vertex);
+
+      for (const Vertex* v=start; v!=end; v++)
       {
-        addVertex(set, vertex);
+        if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
+          addVertex(set, vertex);
+      }
+    }
+  }
+  else // SPARSE
+  {
+    int idx = 0;
+    for (int i=0; i<g->num_nodes; i++)
+    {
+      if(u->curSetFlags[i]==1)
+        u->vertices[idx++] = i;
+    }
+
+    #pragma omp parallel for
+    for (int i=0; i<u->size; i++)
+    {
+      Vertex vertex = u->vertices[i];
+      const Vertex* start = outgoing_begin(g, vertex);
+      const Vertex* end = outgoing_end(g, vertex);
+
+      for (const Vertex* v=start; v!=end; v++)
+      {
+        if (f.update(vertex, *v))
+          addVertex(set, *v);
       }
     }
   }
@@ -98,6 +124,13 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
         if (u->curSetFlags[i]==1 && f(i))
             addVertex(set, i);
       }
+
+      int sum = 0;
+      #pragma omp parallel for reduction(+:sum)
+      for (int i=0; i<u->numNodes; i++)
+        sum += set->curSetFlags[i];
+
+      set->size = sum;
   }
   else
   {
@@ -107,14 +140,14 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
         if (u->curSetFlags[i]==1 && !f(i))
             removeVertex(u, i);
       }
+
+      int sum = 0;
+      #pragma omp parallel for reduction(+:sum)
+      for (int i=0; i<u->numNodes; i++)
+        sum += u->curSetFlags[i];
+
+      u->size = sum;
   }
-
-  int sum = 0;
-  #pragma omp parallel for reduction(+:sum)
-  for (int i=0; i<u->numNodes; i++)
-    sum += set->curSetFlags[i];
-
-  set->size = sum;
 
   return set;
 }
