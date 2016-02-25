@@ -1,8 +1,4 @@
 #!/bin/bash
-#ncpus must be a multiple of 16
-#PBS -l ncpus=16
-#PBS -l pmem=8gb
-#PBS -l walltime=20:00
 
 # Merge stdout and stderr into one output file
 #PBS -j oe
@@ -21,4 +17,4 @@ args="APP GRAPH"
 cp $execdir/$exe $exe
 
 # Run my executable
-./$exe $args
+time ./$exe $args

@@ -23,7 +23,8 @@ VertexSetType setType(Graph g, VertexSet* set)
       outEdges += outgoing_size(g, i);
   }
 
-  if (setNodes/numNodes > outEdges/numEdges)
+  // if (setNodes/numNodes > outEdges/numEdges)
+  if (setNodes * 5 > outEdges)
       return SPARSE;
   else
       return DENSE;
@@ -65,18 +66,12 @@ void freeVertexSet(VertexSet *set)
 void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  if (set->curSetFlags[v] == 0)
-  {
-    set->curSetFlags[v] = 1;
-    // set->vertices[set->size] = v;
-    // set->size = set->size + 1;
-  }
+  set->curSetFlags[v] = 1;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-
   set->curSetFlags[v] = 0;
 }
 

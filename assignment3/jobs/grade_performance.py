@@ -11,10 +11,10 @@ import subprocess
 import sys
 
 GRAPHS = [
+  "/home/15-418/asst3_graphs/soc-pokec_30m.graph",
   "/home/15-418/asst3_graphs/soc-livejournal1_68m.graph",
   "/home/15-418/asst3_graphs/com-orkut_117m.graph",
-  "/home/15-418/asst3_graphs/rmat_200m.graph",
-  "/home/15-418/asst3_graphs/random_500m.graph"
+  "/home/15-418/asst3_graphs/rmat_200m.graph"
 ]
 
 # runGraph returns the student's score and total possible score for runinng 3
@@ -24,6 +24,7 @@ def runGraph(paraGraph, g):
     paraGraph,
     "grade",
     g,
+    "-r" # Don't run ref
   ]
   proc = subprocess.Popen(args, stdout=subprocess.PIPE)
   
@@ -51,6 +52,7 @@ def main():
   score = 0
   possibleScore = 0
   for g in GRAPHS:
+    print "Timing " + g
     graphScore, pScore = runGraph(paraGraph, g) 
     if graphScore < 0:
       sys.stderr.write("Error parsing total grade for graph " + g + "\n")

@@ -26,13 +26,66 @@
 // Output column size
 #define COL_SIZE 15
 
+// Number of points for each runtime matching the original ref runtime.
+#define EXTRA_CREDIT 0.3
+
 /*
  * Reference times on the phi
  * For grading student performance when the reference is not run.
  * Indexed by [APP][graph][number of threads (64, 128, 236)]
  */
 // TODO(kku): Ugly hard-coded size
+
+// Adjusted reference time
 static double refTimeTable[4][4][3] = {
+  // BFS
+  {
+    // com-orkut_117m.graph
+    { 0.2235 , 0.1637 , 0.2415 },
+    // soc-livejournal1_68m
+    { 0.3734 , 0.3135 , 0.4057 },
+    // rmat_200m
+    { 2.1021 , 1.6171 , 1.5956 },
+    // soc-pokec_30m
+    { 0.2081 , 0.1939 , 0.2924 }
+  },
+  // PAGERANK
+  {
+    // com-orkut_117m.graph
+    { 3.8533 , 2.2470 , 1.5512 },
+    // soc-livejournal1_68m
+    { 2.2999 , 1.3957 , 1.0575 },
+    // rmat_200m
+    { 13.5453 , 8.3121 , 6.1407 },
+    // soc-pokec_30m
+    { 1.2403 , 0.7041 , 0.4984 }
+  },
+  // KBFS
+  {
+    // com-orkut_117m.graph
+    { 41.7699 , 26.3132 , 19.4586 },
+    // soc-livejournal1_68m
+    { 10.3742 , 8.3289 , 8.0807 },
+    // rmat_200m
+    { 67.6248 , 52.2105 , 47.1388 },
+    // soc-pokec_30m
+    { 4.5007 , 3.5232 , 3.2306 }
+  },
+  // DECOMP
+  {
+    // com-orkut_117m.graph
+    { 3.0258 , 2.4040 , 2.1483 },
+    // soc-livejournal1_68m
+    { 3.0444 , 2.7236 , 2.6725 },
+    // rmat_200m
+    { 21.8837 , 18.8862 , 17.9954 },
+    // soc-pokec_30m
+    { 1.2287 , 1.0783 , 1.0672 }
+  }
+};
+
+// Original reference time used for extra credit.
+static double refExtraTimeTable[4][4][3] = {
   // BFS
   {
     // com-orkut_117m.graph
@@ -358,10 +411,28 @@ double timeApp(Graph g, int device, int numTrials, double maxPoints,
   double points = std::min(maxPoints, std::max(maxPoints * curve, 0.0));
   points = (correct) ? points : 0.0;
 
+  // Calculate extra credit
+  double refExtraBestTime = DBL_MAX;
+  if (!runRef) {
+    for (int i = minThreadCount; i <= maxThreadCount;
+        i = std::min(maxThreadCount, i * 2)) {
+      refExtraBestTime = std::min(refExtraBestTime,
+          refExtraTimeTable[APP][getGraphIndex(g)][getThreadIndex(i)]);
+      if (i == maxThreadCount)
+        break;
+    }
+  } else {
+    refExtraBestTime = refBestTime;
+  }
+  if (correct && stuBestTime <= refExtraBestTime)
+    points += EXTRA_CREDIT;
+
   sep(timing, '-', 75);
   timing << "Time: " << std::setprecision(2) << std::fixed << fraction << '%' << " of reference solution.";
   if (correct) {
     timing << " Grade: " << std::fixed << std::setprecision(2) << points << std::endl;
+    if (stuBestTime <= refExtraBestTime)
+      timing << "EXTRA CREDIT" << std::endl;
   } else
   {
     timing << " Grade: " << std::fixed << std::setprecision(2) << "INCORRECT" << std::endl;
@@ -371,10 +442,12 @@ double timeApp(Graph g, int device, int numTrials, double maxPoints,
   sep(std::cout, '-', 75);
   std::cout << "Time: " << std::setprecision(2) << std::fixed << fraction << '%' << " of reference solution.";
   if (correct) {
-      std::cout << " Grade: " << std::fixed << std::setprecision(2) << points << std::endl;
+    std::cout << " Grade: " << std::fixed << std::setprecision(2) << points << std::endl;
+    if (stuBestTime <= refExtraBestTime)
+      std::cout << "EXTRA CREDIT" << std::endl;
   } else
   {
-      std::cout << " Grade: " << std::fixed << std::setprecision(2) << "INCORRECT" << std::endl;
+    std::cout << " Grade: " << std::fixed << std::setprecision(2) << "INCORRECT" << std::endl;
   }
   sep(std::cout, '-', 75);
 

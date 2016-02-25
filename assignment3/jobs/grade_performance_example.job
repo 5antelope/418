@@ -1,8 +1,4 @@
 #!/bin/bash
-#ncpus must be a multiple of 16
-#PBS -l ncpus=16
-#PBS -l pmem=8gb
-#PBS -l walltime=20:00
 
 # Merge stdout and stderr into one output file
 #PBS -j oe
@@ -21,4 +17,4 @@ cp $execdir/jobs/grade_performance.py grade_performance.py
 cp $execdir/$exe $exe
 
 # Run my executable
-./grade_performance.py ./$exe
+time ./grade_performance.py ./$exe

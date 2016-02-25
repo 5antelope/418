@@ -1,6 +1,7 @@
 #ifndef __PARAGRAPH_H__
 #define __PARAGRAPH_H__
 
+#include <iostream>
 #include <stdio.h>
 #include <stdbool.h>
 #include <stdlib.h>
@@ -49,10 +50,24 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       const Vertex* start = incoming_begin(g, vertex);
       const Vertex* end = incoming_end(g, vertex);
 
-      for (const Vertex* v=start; v!=end; v++)
+      int len = end-start;
+      if (len <10000)
       {
-        if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
-          addVertex(set, vertex);
+        for (const Vertex* v=start; v!=end; v++)
+        {
+          if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
+            addVertex(set, vertex);
+        }
+      }
+      else
+      {
+        #pragma omp parallel for
+        for (int i=0; i<len; i++)
+        {
+          const Vertex* v = start + i;
+          if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
+            addVertex(set, vertex);
+        }
       }
     }
   }
@@ -72,10 +87,24 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       const Vertex* start = outgoing_begin(g, vertex);
       const Vertex* end = outgoing_end(g, vertex);
 
-      for (const Vertex* v=start; v!=end; v++)
+      int len = end-start;
+      if (len <10000)
       {
-        if (f.update(vertex, *v))
-          addVertex(set, *v);
+        for (const Vertex* v=start; v!=end; v++)
+        {
+          if (f.update(vertex, *v))
+            addVertex(set, *v);
+        }
+      }
+      else
+      {
+        #pragma omp parallel for
+        for (int i=0; i<len; i++)
+        {
+          const Vertex* v = start + i;
+          if (f.update(vertex, *v))
+            addVertex(set, *v);
+        }
       }
     }
   }
