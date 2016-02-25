@@ -44,7 +44,7 @@ void addVertex(VertexSet *set, Vertex v)
   if (set->curSetFlags[v] == 0)
   {
     set->curSetFlags[v] = 1;
-    set->vertices[set->size] = v;
+    // set->vertices[set->size] = v;
     set->size = set->size + 1;
   }
 }
@@ -52,15 +52,15 @@ void addVertex(VertexSet *set, Vertex v)
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  int i = 0;
-  for (; i < set->size; i++)
-  {
-    if (set->vertices[i]==v)
-        break;
-  }
+  // int i = 0;
+  // for (; i < set->size; i++)
+  // {
+  //   if (set->vertices[i]==v)
+  //       break;
+  // }
 
-  for (; i < set->size-1; i++)
-      set->vertices[i] = set->vertices[i+1];
+  // for (; i < set->size-1; i++)
+  //     set->vertices[i] = set->vertices[i+1];
 
   set->curSetFlags[v] = 0;
   set->size = set->size-1;

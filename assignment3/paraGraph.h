@@ -39,7 +39,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
   VertexSet* set = newVertexSet(SPARSE, g->num_nodes, g->num_nodes);
 
-  // #pragma omp parallel for schedule(static)
+  #pragma omp parallel for schedule(static)
   for (int vertex=0; vertex<g->num_nodes; vertex++)
   {
     const Vertex* start = incoming_begin(g, vertex);
@@ -53,6 +53,13 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       }
     }
   }
+
+  // int sum = 0;
+  // #pragma omp parallel for reduction(+:sum)
+  // for (int i=0; i<g->num_nodes; i++)
+  //   sum += set->curSetFlags[i];
+
+  // set->size = sum;
 
   return set;
 }
@@ -80,38 +87,27 @@ template <class F>
 VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
 {
   // TODO: Implement
-  // int k = 0;
-  // // #pragma omp parallel for
-  // for (int i=0; i<u->size; i++)
-  // {
-  //   if (f(u->vertices[i]))
-  //     k++;
-  // }
 
   VertexSet* set = NULL;
 
   if (returnSet)
   {
-      set = newVertexSet(SPARSE, u->numNodes, u->numNodes);
-      for (int i=0; i<u->size; i++)
+      set = newVertexSet(u->type, u->numNodes, u->numNodes);
+      #pragma omp parallel for schedule(static)
+      for (int i=0; i<u->numNodes; i++)
       {
-        if (f(u->vertices[i]))
-            addVertex(set, u->vertices[i]);
+        if (u->curSetFlags[i]==1 && f(i))
+            addVertex(set, i);
       }
-      assert(set != NULL);
   }
   else
   {
-      for (int i=0; i < u->size; )
+      #pragma omp parallel for schedule(static)
+      for (int i=0; i<u->numNodes; i++)
       {
-        if (!f(u->vertices[i]))
-        {
-            removeVertex(u, u->vertices[i]);
-        }
-        else
-            i++;
+        if (u->curSetFlags[i]==1 && !f(i))
+            removeVertex(u, i);
       }
-      assert(set == NULL);
   }
 
   return set;
