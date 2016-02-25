@@ -14,6 +14,7 @@ VertexSetType setType(Graph g, VertexSet* set)
   int numNodes = num_nodes(g);
   int setNodes = set->size;
   int outEdges = 0;
+  int inEdges = 0;
   int numEdges = num_edges(g);
 
   #pragma omp parallel for reduction(+:outEdges) schedule(static)
@@ -23,8 +24,10 @@ VertexSetType setType(Graph g, VertexSet* set)
       outEdges += outgoing_size(g, i);
   }
 
+  inEdges = (numEdges/numNodes) * setNodes / 2;
+
   // if (setNodes/numNodes > outEdges/numEdges)
-  if (setNodes * 5 > outEdges)
+  if (inEdges > outEdges)
       return SPARSE;
   else
       return DENSE;
@@ -84,7 +87,29 @@ VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
 
   // STUDENTS WILL ONLY NEED TO IMPLEMENT THIS FUNCTION IN PART 3 OF
   // THE ASSIGNMENT
+  VertexSet* unionSet = newVertexSet(u->type, u->numNodes, u->numNodes);
 
-  return NULL;
+  #pragma omp parallel for schedule(static)
+  for (int i=0; i<u->numNodes; i++)
+  {
+    if (u->curSetFlags[i]==1)
+        unionSet->curSetFlags[i] = 1;
+  }
+
+  #pragma omp parallel for schedule(static)
+  for (int i=0; i<v->numNodes; i++)
+  {
+    if (v->curSetFlags[i]==1)
+        unionSet->curSetFlags[i] = 1;
+  }
+
+  int sum = 0;
+  #pragma omp parallel for reduction(+:sum)
+  for (int i=0; i<u->numNodes; i++)
+    sum += unionSet->curSetFlags[i];
+
+  unionSet->size = sum;
+
+  return unionSet;
 }
 
