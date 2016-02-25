@@ -38,8 +38,8 @@ template <class F>
 VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 {
   VertexSet* set = newVertexSet(SPARSE, g->num_nodes, g->num_nodes);
-  memcpy(set->flags, u->flags, sizeof(int) * g->num_nodes);
 
+  // #pragma omp parallel for schedule(static)
   for (int vertex=0; vertex<g->num_nodes; vertex++)
   {
     const Vertex* start = incoming_begin(g, vertex);

@@ -14,7 +14,7 @@ typedef struct {
   int numNodes; // Number of nodes in the graph
   VertexSetType type;
   Vertex* vertices;
-  int* flags;
+  // int* flags;
   int* curSetFlags;
 } VertexSet;
 

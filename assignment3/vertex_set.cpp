@@ -26,10 +26,7 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 
   vertexSet->vertices = (Vertex *)malloc(capacity * sizeof(Vertex));
 
-  vertexSet->flags = (int *)calloc(numNodes, sizeof(int));
-
   vertexSet->curSetFlags = (int *)calloc(numNodes, sizeof(int));
-  // memset(vertexSet->curSetFlags, -1, sizeof(int) * numNodes);
 
   return vertexSet;
 }
@@ -38,22 +35,18 @@ void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
   free(set->vertices);
-  free(set->flags);
   delete set;
 }
 
 void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-
   if (set->curSetFlags[v] == 0)
   {
     set->curSetFlags[v] = 1;
     set->vertices[set->size] = v;
     set->size = set->size + 1;
   }
-
-  set->flags[v] = 1;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
@@ -69,7 +62,6 @@ void removeVertex(VertexSet *set, Vertex v)
   for (; i < set->size-1; i++)
       set->vertices[i] = set->vertices[i+1];
 
-  set->flags[v] = 0;
   set->curSetFlags[v] = 0;
   set->size = set->size-1;
 }
