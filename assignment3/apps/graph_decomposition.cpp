@@ -11,7 +11,6 @@
 
 **/
 void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
-
     //initialize decomp? no need
     int * updateAtIter = (int *)malloc(num_nodes(g)* sizeof(int));
     #pragma omp parallel for schedule(dynamic)
@@ -31,41 +30,42 @@ void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
 
     while (frontier->size > 0)
     {
-        VertexSet* new_frontier = newVertexSet(SPARSE, 1, num_nodes(g));
-        int count = 0;
-        for (int i = 0; i < frontier->numNodes; i++)
-        {
-            if (frontier->curSetFlags[i] == 1)
-                count++;
-        }
-
-        #pragma omp parallel for schedule(static)
-        for (int i = 0; i < frontier->numNodes; i++)
-        {
-            if (frontier->curSetFlags[i] == 1)
-            {
-                int u = i;
-                //incoming edges/ outgoing edges...
-                const Vertex *start = outgoing_begin(g, u);
-                const Vertex *end = outgoing_end(g, u);
-                //for each outgoing edge
-                for (const Vertex *v = start; v != end; v++)
-                {
-                  if (decomp[*v] == -1)
-                  {
-                      //mark them as cluster id
-                      decomp[*v] = decomp[u];
-                      updateAtIter[*v] = iter;
-                      new_frontier->curSetFlags[*v] = 1;
-                  }
-                  else if (updateAtIter[*v] == iter)
-                  {
-                      if (decomp[u] < decomp[*v])
-                          decomp[*v] = decomp[u];
-                  }
-                }
-            }
+      VertexSet* new_frontier = newVertexSet(SPARSE, 1, num_nodes(g));
+      int count = 0;
+      for (int i = 0; i < frontier->numNodes; i++)
+      {
+          if (frontier->curSetFlags[i] == 1)
+              count++;
       }
+
+      #pragma omp parallel for schedule(static)
+      for (int i = 0; i < frontier->numNodes; i++)
+      {
+        if (frontier->curSetFlags[i] == 1)
+        {
+          int u = i;
+          //incoming edges/ outgoing edges...
+          const Vertex *start = outgoing_begin(g, u);
+          const Vertex *end = outgoing_end(g, u);
+          //for each outgoing edge
+          for (const Vertex *v = start; v != end; v++)
+          {
+            if (decomp[*v] == -1)
+            {
+                //mark them as cluster id
+                decomp[*v] = decomp[u];
+                updateAtIter[*v] = iter;
+                new_frontier->curSetFlags[*v] = 1;
+            }
+            else if (updateAtIter[*v] == iter)
+            {
+                if (decomp[u] < decomp[*v])
+                    decomp[*v] = decomp[u];
+            }
+          }
+        }
+      }
+
       #pragma omp atomic
       iter++;
 
