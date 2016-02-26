@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Merge stdout and stderr into one output file
+#PBS -j oe
+
+#PBS -q phi
+
+# Move to my $SCRATCH directory.
+cd $SCRATCH
+
+# Set this to the important directory.
+execdir=PROGDIR
+exe=paraGraph
+args="APP GRAPH"
+
+# Copy executable to $SCRATCH.
+cp $execdir/$exe $exe
+
+# Run my executable
+time ./$exe $args
