@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Merge stdout and stderr into one output file
+#PBS -j oe
+
+#PBS -q phi
+
+# Move to my $SCRATCH directory.
+cd $SCRATCH
+
+# Set this to the important directory.
+execdir=PROGDIR
+exe=paraGraph
+
+# Copy executable to $SCRATCH.
+cp $execdir/jobs/grade_performance.py grade_performance.py
+cp $execdir/$exe $exe
+
+# Run my executable
+time ./grade_performance.py ./$exe
