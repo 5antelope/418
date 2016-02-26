@@ -216,8 +216,7 @@ Graph load_graph(const char* filename)
 
   build_incoming_edges(graph);
 
-
- // print_graph(graph);
+  // print_graph(graph);
 
   return graph;
 }
@@ -264,8 +263,6 @@ Graph load_graph_binary(const char* filename)
     fclose(input);
 
     build_incoming_edges(graph);
-
-
     //print_graph(graph);
     return graph;
 }

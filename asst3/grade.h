@@ -190,16 +190,13 @@ static void printTimingApp(std::ostream& timing, const char* appName)
 template <class T>
 bool compareArrays(Graph graph, T* ref, T* stu)
 {
-  //bool r = true;
   for (int i = 0; i < graph->num_nodes; i++) {
     if (ref[i] != stu[i]) {
-      std::cerr << "*** Lei: Results disagree at " << i << " expected "
+      std::cerr << "*** Results disagree at " << i << " expected " 
         << ref[i] << " found " << stu[i] << std::endl;
       return false;
-      //r= false;
     }
   }
-  //return r;
   return true;
 }
 
