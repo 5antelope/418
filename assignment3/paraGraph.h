@@ -56,7 +56,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       {
         for (const Vertex* v=start; v!=end; v++)
         {
-          if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
+          if (u->curSetFlags[*v] && f.update(*v, vertex))
             addVertex(set, vertex);
         }
       }
@@ -66,7 +66,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         for (int i=0; i<len; i++)
         {
           const Vertex* v = start + i;
-          if (u->curSetFlags[*v]==1 && f.update(*v, vertex))
+          if (u->curSetFlags[*v] && f.update(*v, vertex))
             addVertex(set, vertex);
         }
       }
@@ -80,7 +80,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
     int idx = 0;
     for (int i=0; i<g->num_nodes; i++)
     {
-      if(u->curSetFlags[i]==1)
+      if(u->curSetFlags[i])
         u->vertices[idx++] = i;
     }
 
@@ -116,7 +116,10 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
   int sum = 0;
   #pragma omp parallel for reduction(+:sum)
   for (int i=0; i<g->num_nodes; i++)
-    sum += set->curSetFlags[i];
+  {
+    if (set->curSetFlags[i])
+      sum += 1;
+  }
 
   set->size = sum;
 
@@ -161,7 +164,10 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       int sum = 0;
       #pragma omp parallel for reduction(+:sum)
       for (int i=0; i<u->numNodes; i++)
-        sum += set->curSetFlags[i];
+      {
+        if (u->curSetFlags[i])
+          sum += 1;
+      }
 
       set->size = sum;
   }
@@ -170,14 +176,17 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       #pragma omp parallel for schedule(static)
       for (int i=0; i<u->numNodes; i++)
       {
-        if (u->curSetFlags[i]==1 && !f(i))
+        if (u->curSetFlags[i] && !f(i))
             removeVertex(u, i);
       }
 
       int sum = 0;
       #pragma omp parallel for reduction(+:sum)
       for (int i=0; i<u->numNodes; i++)
-        sum += u->curSetFlags[i];
+      {
+        if (u->curSetFlags[i])
+          sum += 1;
+      }
 
       u->size = sum;
   }

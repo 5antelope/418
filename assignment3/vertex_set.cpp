@@ -51,10 +51,10 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 
   vertexSet->vertices = NULL;
 
-  vertexSet->curSetFlags = (int *)malloc(numNodes * sizeof(int));
+  vertexSet->curSetFlags = (bool *)malloc(numNodes * sizeof(bool));
   #pragma omp parallel for
   for (int i=0; i<numNodes; i++)
-    vertexSet->curSetFlags[i] = 0;
+    vertexSet->curSetFlags[i] = false;
 
   return vertexSet;
 }
@@ -71,13 +71,13 @@ void freeVertexSet(VertexSet *set)
 void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  set->curSetFlags[v] = 1;
+  set->curSetFlags[v] = true;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  set->curSetFlags[v] = 0;
+  set->curSetFlags[v] = false;
 }
 
 /**
@@ -94,21 +94,17 @@ VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
   #pragma omp parallel for schedule(static)
   for (int i=0; i<u->numNodes; i++)
   {
-    if (u->curSetFlags[i]==1)
-        unionSet->curSetFlags[i] = 1;
-  }
-
-  #pragma omp parallel for schedule(static)
-  for (int i=0; i<v->numNodes; i++)
-  {
-    if (v->curSetFlags[i]==1)
-        unionSet->curSetFlags[i] = 1;
+    if (u->curSetFlags[i]==true || v->curSetFlags[i]==true)
+        unionSet->curSetFlags[i] = true;
   }
 
   int sum = 0;
   #pragma omp parallel for reduction(+:sum)
   for (int i=0; i<u->numNodes; i++)
-    sum += unionSet->curSetFlags[i];
+  {
+    if (unionSet->curSetFlags[i])
+      sum += 1;
+  }
 
   unionSet->size = sum;
 
