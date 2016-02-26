@@ -11,11 +11,8 @@
 
 VertexSetType setType(Graph g, VertexSet* set)
 {
-  int numNodes = num_nodes(g);
-  int setNodes = set->size;
   int outEdges = 0;
   int inEdges = 0;
-  int numEdges = num_edges(g);
 
   #pragma omp parallel for reduction(+:outEdges) schedule(static)
   for (int i=0; i<set->numNodes; i++)
@@ -24,9 +21,7 @@ VertexSetType setType(Graph g, VertexSet* set)
       outEdges += outgoing_size(g, i);
   }
 
-  inEdges = (numEdges/numNodes) * setNodes / 2;
-
-  if (inEdges > outEdges)
+  if (inEdges >= 10 * outEdges)
       return SPARSE;
   else
       return DENSE;
@@ -60,7 +55,6 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 
 void freeVertexSet(VertexSet *set)
 {
-  // TODO: Implement
   if (set->vertices != NULL)
     free(set->vertices);
   free(set->curSetFlags);
@@ -69,14 +63,14 @@ void freeVertexSet(VertexSet *set)
 
 void addVertex(VertexSet *set, Vertex v)
 {
-  // TODO: Implement
   set->curSetFlags[v] = true;
+  set->size = set->size+1;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
-  // TODO: Implement
   set->curSetFlags[v] = false;
+  set->size = set->size-1;
 }
 
 /**
@@ -84,8 +78,6 @@ void removeVertex(VertexSet *set, Vertex v)
  */
 VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
 {
-  // TODO: Implement
-
   // STUDENTS WILL ONLY NEED TO IMPLEMENT THIS FUNCTION IN PART 3 OF
   // THE ASSIGNMENT
   VertexSet* unionSet = newVertexSet(u->type, u->numNodes, u->numNodes);
@@ -106,6 +98,9 @@ VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
   }
 
   unionSet->size = sum;
+
+  freeVertexSet(u);
+  freeVertexSet(v);
 
   return unionSet;
 }
