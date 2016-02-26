@@ -64,6 +64,7 @@ void freeVertexSet(VertexSet *set)
   // TODO: Implement
   if (set->vertices != NULL)
     free(set->vertices);
+  free(set->curSetFlags);
   delete set;
 }
 
