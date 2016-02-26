@@ -26,7 +26,6 @@ VertexSetType setType(Graph g, VertexSet* set)
 
   inEdges = (numEdges/numNodes) * setNodes / 2;
 
-  // if (setNodes/numNodes > outEdges/numEdges)
   if (inEdges > outEdges)
       return SPARSE;
   else
