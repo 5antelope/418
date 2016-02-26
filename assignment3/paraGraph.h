@@ -51,9 +51,6 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       const Vertex* start = incoming_begin(g, vertex);
       const Vertex* end = incoming_end(g, vertex);
 
-      if (!f.cond(vertex))
-          continue;
-
       int len = end-start;
       if (len < THRESHOLD)
       {
@@ -99,7 +96,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       {
         for (const Vertex* v=start; v!=end; v++)
         {
-          if (f.cond(*v) && f.update(vertex, *v))
+          if (f.update(vertex, *v))
             set->curSetFlags[*v] = true;
         }
       }
@@ -109,7 +106,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         for (int i=0; i<len; i++)
         {
           const Vertex* v = start + i;
-          if (f.cond(*v) && f.update(vertex, *v))
+          if (f.update(vertex, *v))
             set->curSetFlags[*v] = true;
         }
       }
