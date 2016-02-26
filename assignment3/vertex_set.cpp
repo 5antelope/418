@@ -49,7 +49,7 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
   vertexSet->numNodes = numNodes;
   vertexSet->type = type;
 
-  vertexSet->vertices = (Vertex *)malloc(capacity * sizeof(Vertex));
+  vertexSet->vertices = NULL;
 
   vertexSet->curSetFlags = (int *)malloc(numNodes * sizeof(int));
   #pragma omp parallel for
@@ -62,7 +62,8 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
-  free(set->vertices);
+  if (set->vertices != NULL)
+    free(set->vertices);
   delete set;
 }
 

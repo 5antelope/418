@@ -12,6 +12,7 @@
 
 #include "mic.h"
 
+#define THRESHOLD 10000
 // #define DEBUG
 /*
  * edgeMap --
@@ -51,7 +52,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       const Vertex* end = incoming_end(g, vertex);
 
       int len = end-start;
-      if (len <10000)
+      if (len < THRESHOLD)
       {
         for (const Vertex* v=start; v!=end; v++)
         {
@@ -73,6 +74,9 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
   }
   else // SPARSE
   {
+    if (u->vertices == NULL)
+      u->vertices = (Vertex *)malloc(g->num_nodes * sizeof(Vertex));
+
     int idx = 0;
     for (int i=0; i<g->num_nodes; i++)
     {
@@ -88,7 +92,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
       const Vertex* end = outgoing_end(g, vertex);
 
       int len = end-start;
-      if (len <10000)
+      if (len < THRESHOLD)
       {
         for (const Vertex* v=start; v!=end; v++)
         {
