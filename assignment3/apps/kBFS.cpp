@@ -146,6 +146,7 @@ void kBFS(graph *g, int *distField) {
   int iter = 0;
 
   // set up globals
+  #pragma omp parallel for schedule(static)
   for (int i = 0; i < g->num_nodes; i++)
     distField[i] = NA;
   radii = distField;
@@ -172,13 +173,11 @@ void kBFS(graph *g, int *distField) {
   for (int i = 0; i < numSources; i++) {
     addVertex(frontier, S[i]);
   }
-  frontier->size = numSources;
 
   // iterate over values 1 thru k to do initialization
   VertexSet* ks = newVertexSet(SPARSE, numSources, g->num_nodes);
-  for (int i = 0; i < numSources; i++)
+  for (int i = 0; i < numSources; i++) 
     addVertex(ks, i);
-  ks->size = numSources;
 
   Init i(S, visited, nextVisited, radii);
   vertexMap(ks, i, NORETURN);
