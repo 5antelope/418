@@ -57,7 +57,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         for (const Vertex* v=start; v!=end; v++)
         {
           if (u->curSetFlags[*v] && f.update(*v, vertex))
-            addVertex(set, vertex);
+            set->curSetFlags[vertex] = true;
         }
       }
       else
@@ -67,7 +67,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         {
           const Vertex* v = start + i;
           if (u->curSetFlags[*v] && f.update(*v, vertex))
-            addVertex(set, vertex);
+            set->curSetFlags[vertex] = true;
         }
       }
     }
@@ -97,7 +97,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         for (const Vertex* v=start; v!=end; v++)
         {
           if (f.update(vertex, *v))
-            addVertex(set, *v);
+            set->curSetFlags[*v] = true;
         }
       }
       else
@@ -107,7 +107,7 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         {
           const Vertex* v = start + i;
           if (f.update(vertex, *v))
-            addVertex(set, *v);
+            set->curSetFlags[*v] = true;
         }
       }
     }
@@ -158,7 +158,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       for (int i=0; i<u->numNodes; i++)
       {
         if (u->curSetFlags[i]==1 && f(i))
-            addVertex(set, i);
+            set->curSetFlags[i] = true;
       }
 
       int sum = 0;
@@ -177,7 +177,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       for (int i=0; i<u->numNodes; i++)
       {
         if (u->curSetFlags[i] && !f(i))
-            removeVertex(u, i);
+            u->curSetFlags[i] = false;
       }
 
       int sum = 0;

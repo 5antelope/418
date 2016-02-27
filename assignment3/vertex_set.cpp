@@ -26,7 +26,6 @@ VertexSetType setType(Graph g, VertexSet* set)
 
   inEdges = (numEdges/numNodes) * setNodes / 2;
 
-  // if (setNodes/numNodes > outEdges/numEdges)
   if (inEdges > outEdges)
       return SPARSE;
   else
@@ -72,12 +71,14 @@ void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
   set->curSetFlags[v] = true;
+  set->size++;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
   set->curSetFlags[v] = false;
+  set->size--;
 }
 
 /**
