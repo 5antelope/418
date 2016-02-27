@@ -158,7 +158,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       for (int i=0; i<u->numNodes; i++)
       {
         if (u->curSetFlags[i]==1 && f(i))
-            addVertex(set, i);
+            set->curSetFlags[i] = true;
       }
 
       int sum = 0;
@@ -177,7 +177,7 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
       for (int i=0; i<u->numNodes; i++)
       {
         if (u->curSetFlags[i] && !f(i))
-            removeVertex(u, i);
+            u->curSetFlags[i] = false;
       }
 
       int sum = 0;
