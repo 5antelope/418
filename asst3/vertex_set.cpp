@@ -9,28 +9,54 @@
 
 #include <omp.h>
 
+#define SparseRatio 0.0001
+
 VertexSetType setType(Graph g, VertexSet* set)
 {
-  int numNodes = num_nodes(g);
-  int setNodes = set->size;
-  int outEdges = 0;
-  int inEdges = 0;
-  int numEdges = num_edges(g);
 
-#pragma omp parallel for reduction(+:outEdges) schedule(static)
-  for (int i=0; i<set->numNodes; i++)
-  {
-    if (set->curSetFlags[i]==1)
-      outEdges += outgoing_size(g, i);
+  if((unsigned int)set->size==num_nodes(g)){
+    //printf("pagerank!\n");
+    return PAGERANK;
   }
 
-  inEdges = (numEdges/numNodes) * setNodes / 2;
+//   if((unsigned int)set->size<=Ratio*num_nodes(g)){
+//     printf("Sparse!\n");
+//     return SPARSE;
+//   }else{
+//     printf("dense!\n");
+//     return DENSE;
+//   }
 
-  // if (setNodes/numNodes > outEdges/numEdges)
-  if (inEdges > outEdges)
-    return SPARSE;
-  else
-    return DENSE;
+
+//  if((unsigned int)set->size>=Ratio*num_nodes(g)){
+//    printf("Dense!\n");
+//     return DENSE;
+  //}else {
+
+
+    unsigned int outEdges = 0;
+    unsigned int inEdges = 0;
+//#pragma omp parallel for reduction(+:outEdges) schedule(static)
+//    for (int i = 0; i < set->numNodes; i++) {
+//      if (set->curSetFlags[i] == 1)
+//        outEdges += outgoing_size(g, i);
+//    }
+//    if(outEdges<0){
+//      printf("negative outEdge=%y! return dense\n",outEdges);
+//      return DENSE;
+//    }
+    outEdges = set->size;
+    inEdges= SparseRatio*num_edges(g);
+    if (inEdges > outEdges) {
+      //printf("indEdge= %u > outEdge= %u Sparse!\n",inEdges,outEdges);
+      return SPARSE; //top down
+    }
+    else {
+      //printf("indEdge= %u <outEdge= %u dense!\n",inEdges,outEdges);
+      return DENSE; //bottom up
+    }
+
+
 }
 
 /**
@@ -49,21 +75,20 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
   vertexSet->numNodes = numNodes;
   vertexSet->type = type;
 
-  vertexSet->vertices = NULL;
-
-  vertexSet->curSetFlags = (int *)malloc(numNodes * sizeof(int));
+  //vertexSet->visited = (bool *)malloc(numNodes*numNodes * sizeof(bool));//used by bfs / kbfs?
+  vertexSet->curSetFlags = (bool *)malloc(numNodes * sizeof(bool));
 #pragma omp parallel for
-  for (int i=0; i<numNodes; i++)
-    vertexSet->curSetFlags[i] = 0;
-
+  for (int i=0; i<numNodes; i++) {
+    vertexSet->curSetFlags[i] = false;
+  }
   return vertexSet;
 }
 
 void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
-  if (set->vertices != NULL)
-    free(set->vertices);
+
+  //free(set->visited);
   free(set->curSetFlags);
   delete set;
 }
@@ -71,13 +96,15 @@ void freeVertexSet(VertexSet *set)
 void addVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  set->curSetFlags[v] = 1;
+  set->curSetFlags[v] = true;
+  set->size+=1;
 }
 
 void removeVertex(VertexSet *set, Vertex v)
 {
   // TODO: Implement
-  set->curSetFlags[v] = 0;
+  set->curSetFlags[v] = false;
+  set->size-=1;
 }
 
 /**
@@ -94,21 +121,17 @@ VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
 #pragma omp parallel for schedule(static)
   for (int i=0; i<u->numNodes; i++)
   {
-    if (u->curSetFlags[i]==1)
-      unionSet->curSetFlags[i] = 1;
-  }
-
-#pragma omp parallel for schedule(static)
-  for (int i=0; i<v->numNodes; i++)
-  {
-    if (v->curSetFlags[i]==1)
-      unionSet->curSetFlags[i] = 1;
+    if (u->curSetFlags[i]==true || v->curSetFlags[i]==true)
+      unionSet->curSetFlags[i] = true;
   }
 
   int sum = 0;
 #pragma omp parallel for reduction(+:sum)
   for (int i=0; i<u->numNodes; i++)
-    sum += unionSet->curSetFlags[i];
+  {
+    if (unionSet->curSetFlags[i])
+      sum += 1;
+  }
 
   unionSet->size = sum;
 

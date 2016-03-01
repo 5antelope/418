@@ -1,47 +1,72 @@
 #include "paraGraph.h"
 #include "graph.h"
 #include <stdio.h>
-
-//#define DEBUG
-#ifdef DEBUG
-# define dbg_printf(...) printf(__VA_ARGS__)
-#else
-# define dbg_printf(...)
-#endif
-
-void printGraph(graph* graph)
+class Graph_decomposition
 {
-    printf("==================================================================\n");
+public:
+    Graph g;
+    int* solution;
+    int* dus;
+    int maxVal;
+    int maxId;
+    int * updateAtIter;
+    int * iter;
 
-    printf("Graph pretty print:\n");
-    printf("num_nodes=%d\n", graph->num_nodes);
-    printf("num_edges=%d\n", graph->num_edges);
-
-    for (int i=0; i<graph->num_nodes; i++) {
-
-        int start_edge = graph->outgoing_starts[i];
-        int end_edge = (i == graph->num_nodes-1) ? graph->num_edges : graph->outgoing_starts[i+1];
-        printf("node %02d: out=%d: ", i, end_edge - start_edge);
-        for (int j=start_edge; j<end_edge; j++) {
-            int target = graph->outgoing_edges[j];
-            printf("%d ", target);
+    Graph_decomposition(Graph g, int* solution, int* dus, int maxVal, int maxId, int* updateAtIter, int* iter)
+            : g(g), solution(solution), dus(dus), maxVal(maxVal), maxId(maxId),updateAtIter(updateAtIter), iter(iter)
+    {
+#pragma omp parallel for
+        for (int i = 0; i < num_nodes(g); i++) {
+            solution[i] = -1;
+            updateAtIter[i]=-1;
         }
-        printf("\n");
-
-        start_edge = graph->incoming_starts[i];
-        end_edge = (i == graph->num_nodes-1) ? graph->num_edges : graph->incoming_starts[i+1];
-        printf("           in=%d: ", end_edge - start_edge);
-        for (int j=start_edge; j<end_edge; j++) {
-            int target = graph->incoming_edges[j];
-            printf("%d ", target);
-        }
-        printf("\n");
+        solution[maxId]=maxId;
     }
-    printf("==================================================================\n");
-}
+
+    bool update(Vertex src, Vertex dst) {
+        //printf("update dst=%d, updateAtIter=%d, iter=%d\n",dst, updateAtIter[dst],*iter);
+//        if (distances_[dst] == NA)
+//            return __sync_bool_compare_and_swap(&distances_[dst], NA, currentDistance);
+        updateAtIter[dst] = *iter;
+        bool r;
+
+
+        if (solution[dst] == -1) {
+            //printf("-1 writting src %d's cluster %d to %d\n", src, solution[src], dst);
+            r= __sync_bool_compare_and_swap(&solution[dst], -1, solution[src]);
+        }
+
+        if (solution[dst] > solution[src]) {
+            //printf("> writting src %d's cluster %d to %d\n", src, solution[src], dst);
+            r= __sync_bool_compare_and_swap(&solution[dst], solution[dst], solution[src]);
+        }
+        r= true;
+
+        return r;
+    }
+
+    //bottom up only
+    bool cond(Vertex src, Vertex v) {
+        if(solution[v]==-1) {
+            return true;
+        }
+        if(solution[v]!=-1&&updateAtIter[v]==*iter) {
+            return true;
+        }
+        return false;
+    }
+    //top down and bottom up
+    bool cond(Vertex v) {
+        return true;
+    }
+
+
+private:
+
+};
 /**
 	Given a graph, a deltamu per node, the max deltamu value, and the id
-	of the node with the max deltamu, decompose the graph into clusters. 
+	of the node with the max deltamu, decompose the graph into clusters.
         Returns for each vertex the cluster id that it belongs to inside decomp.
 	NOTE: deltamus are given as integers, floating point differences
 	are resolved by node id order
@@ -50,110 +75,54 @@ void printGraph(graph* graph)
 void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
 
     //initialize decomp? no need
-
     int * updateAtIter = (int *)malloc(num_nodes(g)* sizeof(int));
-    #pragma omp parallel for schedule(dynamic)
-    for(int i = 0; i< num_nodes(g); i++){
-        decomp[i]=-1;
-        updateAtIter[i]=-1;
-    }
 
-    dbg_printf("decompose maxId=%d\n",maxId);
 
     VertexSet* frontier = newVertexSet(SPARSE, 1, num_nodes(g));
     addVertex(frontier,maxId);
-    frontier->size=1;
-    decomp[maxId]=maxId;
-    updateAtIter[maxId]=0;
 
-    int iter = 0;
+    int iter=0;
+   // printf("add index %d to be cluster!\n",maxId);
 
-    dbg_printf("frontier->size, %d\n",frontier->size);
-    //printGraph(g);
-    dbg_printf("decomp 0=%d\n",decomp[15]);
 
-    while (frontier->size > 0) {
-        //print status of each iteration
-        VertexSet* new_frontier = newVertexSet(SPARSE, 1, num_nodes(g));
-        dbg_printf("status: ");
-            int count = 0;
-            for (int i = 0; i < frontier->numNodes; i++) {
-                if (frontier->curSetFlags[i] == 1)
-                    count++;
-                dbg_printf("%d ", frontier->curSetFlags[i]);
-            }
-        dbg_printf("size: %d", frontier->size);
-        dbg_printf("\n");
+    Graph_decomposition f( g, decomp, dus, maxVal,  maxId, updateAtIter,  &iter);
 
-        //for each vertex in frontier
-#pragma omp parallel for schedule(static)
-        for (int i = 0; i < frontier->numNodes; i++) {
-            if (frontier->curSetFlags[i] == 1) {
-                int u = i;
-                //incoming edges/ outgoing edges...
-                const Vertex *start = outgoing_begin(g, u);
-                const Vertex *end = outgoing_end(g, u);
-                //for each outgoing edge
-//#pragma omp parallel for
-                for (const Vertex *v = start; v != end; v++) {
-//#pragma omp single
-  //                  {
-                        if (decomp[*v] == -1) {
-                            //mark them as cluster id
-                            dbg_printf("mark %d vertex to be u=%d,cluster[u]=%d \n", *v, u, decomp[u]);
-                            decomp[*v] = decomp[u];
-                            updateAtIter[*v] = iter;
-                            new_frontier->curSetFlags[*v] = 1;
+    VertexSet *newFrontier;
 
-                            //new_frontier->size++;
-                        } else if (updateAtIter[*v] == iter) {
-                            if (decomp[u] < decomp[*v]) {
-                                decomp[*v] = decomp[u];
-                            }
-                        }
-               //     }
-                }
-            }
-        }
-        #pragma omp atomic
+    while (frontier->size > 0)
+    {
+       // printf("iter=%d, frontier->size=%d\n",iter,frontier->size);
+        newFrontier = edgeMap<Graph_decomposition>(g, frontier, f);
+        //printf("newFrontier->size=%d\n",newFrontier->size);
+        //printf("iter=%d\n",f.iter);
+        freeVertexSet(frontier);
+        frontier = newFrontier;
         iter++;
 
-        dbg_printf("iter=%d\n", iter);
-        // start growing all balls i at the next iter with
-        // unvisited center i and with maxDu - dus[i] < iter
-#pragma omp parallel for schedule(static)
-        for (int i = 0; i < num_nodes(g); i++) {
-            if (decomp[i] == -1) {
-                if ((maxVal - dus[i])<iter) {
-                    dbg_printf("grow %d vertex to be cluster center\n", i);
-                    new_frontier->curSetFlags[i] = 1;
-                    decomp[i]=i;
-                    //new_frontier->size++;
+#pragma omp parallel for schedule(guided)
+        for (int i = 0; i < num_nodes(g); i++)
+        {
+            if (f.solution[i] == -1)
+            {
+                if ((maxVal - dus[i])<iter)
+                {
+                   // printf("grow index %d to be cluster! (maxVal - dus[i])=%d\n",i,(maxVal - dus[i]));
+                    newFrontier->curSetFlags[i] = 1;
+                    f.solution[i]=i;
                 }
             }
         }
 
-        //calculate size
         int sum = 0;
 #pragma omp parallel for reduction(+:sum)
         for (int i=0; i<num_nodes(g); i++)
-            sum += new_frontier->curSetFlags[i];
+            sum += newFrontier->curSetFlags[i];
 
+        newFrontier->size = sum;
 
-        new_frontier->size = sum;
-
-        free(frontier->curSetFlags);
-        frontier=new_frontier;
+//        free(frontier->curSetFlags);
+//        frontier=new_frontier;
     }
 
-
-    //print result
-//    printf("result: \n");
-//    for (int i=0; i<g->num_nodes; i++) {
-//        printf("%d: %d \n",i,decomp[i]);
-//    }
-//    printf(";\n");
-
     free(updateAtIter);
-
 }

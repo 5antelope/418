@@ -48,6 +48,11 @@ struct State
     return true;
   }
 
+    bool cond(Vertex v1, Vertex v)
+    {
+      return true;
+    }
+
   T getError()
   {
     int numNodes = num_nodes(graph);

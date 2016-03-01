@@ -154,6 +154,7 @@ void kBFS(graph *g, int *distField) {
   visited = (int**) malloc(sizeof(int*) * g->num_nodes);
   nextVisited = (int**) malloc(sizeof(int*) * g->num_nodes);
 
+#pragma omp parallel for schedule(guided)
   for (int i = 0; i < g->num_nodes; i++) {
     visited[i] = (int*) malloc(sizeof(int) * NUMWORDS);
     nextVisited[i] = (int*) malloc(sizeof(int) * NUMWORDS);

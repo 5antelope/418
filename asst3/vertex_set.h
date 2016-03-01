@@ -7,16 +7,16 @@
 typedef enum {
     SPARSE,
     DENSE,
+    PAGERANK,
 } VertexSetType;
 
 typedef struct {
     int size;     // Number of nodes in the set
     int numNodes; // Number of nodes in the graph
     VertexSetType type;
-    Vertex* vertices;
-    int* curSetFlags;
-    //bool* vertices;
-
+    //int k;
+    //bool* visited;
+    bool* curSetFlags;
 } VertexSet;
 
 VertexSetType setType(const Graph, VertexSet*);
