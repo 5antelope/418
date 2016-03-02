@@ -53,10 +53,9 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
         //loop through all vertexes in Graph, if vertexes' incoming edge is in u, add itself into frontier...
         for (int vertex=0; vertex<g->num_nodes; vertex++){
             //if v has been visited, continue
-
-            if(!f.cond(vertex)){
+            if(!f.cond(vertex))
                 continue;
-            }
+
             if(set->curSetFlags[vertex])  //||u->curSetFlags[vertex] TODO why this is not working?
                 continue;
 
@@ -65,20 +64,17 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 
             for (const Vertex* v=start; v!=end; v++)
             {
-                if(!f.cond(*v, vertex)){
+                if(!f.cond(*v, vertex))
                     continue;
-                }
-                if (u->curSetFlags[*v] && f.update(*v, vertex)) {
+                if (u->curSetFlags[*v] && f.update(*v, vertex))
                     set->curSetFlags[vertex] = true;
-                }
             }
-
-
         }
     }
-    else if(type== PAGERANK){
+    else if(type == PAGERANK)
+    {
         //bottom up
-    #pragma omp parallel for schedule(guided)
+        #pragma omp parallel for schedule(guided)
         for (int vertex=0; vertex<g->num_nodes; vertex++){
             if(u->curSetFlags[vertex]==true)
                 continue;
@@ -92,7 +88,9 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
             }
 
         }
-    }else if (type==SPARSE){
+    }
+    else if (type==SPARSE)
+    {
         //top down
         #pragma omp parallel for schedule(guided)
         for(int i=0; i<g->num_nodes; i++){
@@ -101,17 +99,17 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
             const Vertex *start = outgoing_begin(g, i);
             const Vertex *end = outgoing_end(g, i);
 
-            for (const Vertex *v = start; v != end; v++) {
+            for (const Vertex *v = start; v != end; v++)
+            {
 
-                if (f.cond(i,*v) && f.update(i, *v)) {
+                if (f.cond(i,*v) && f.update(i, *v))
                     set->curSetFlags[*v] = true;
-                }
             }
         }
     }
 
     int sum = 0;
-#pragma omp parallel for schedule(static) reduction(+:sum)
+    #pragma omp parallel for schedule(static) reduction(+:sum)
     for (int i=0; i<g->num_nodes; i++)
     {
         sum += set->curSetFlags[i];
@@ -153,39 +151,32 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
         #pragma omp parallel for schedule(guided)
         for (int i=0; i<u->numNodes; i++)
         {
-            if (u->curSetFlags[i]==1 && f(i)){
+            if (u->curSetFlags[i]==1 && f(i))
                 set->curSetFlags[i] = true;
-            }
         }
 
         int sum = 0;
         #pragma omp parallel for schedule(static) reduction(+:sum)
         for (int i=0; i<u->numNodes; i++)
-        {
             sum += set->curSetFlags[i];
-        }
 
         set->size = sum;
     }
     else
     {
-    #pragma omp parallel for schedule(guided)
+        #pragma omp parallel for schedule(guided)
         for (int i=0; i<u->numNodes; i++)
         {
-            if (u->curSetFlags[i] && !f(i)){
+            if (u->curSetFlags[i] && !f(i))
                 u->curSetFlags[i] = false;
-            }
         }
 
         int sum = 0;
-    #pragma omp parallel for schedule(static) reduction(+:sum)
+        #pragma omp parallel for schedule(static) reduction(+:sum)
         for (int i=0; i<u->numNodes; i++)
-        {
             sum += u->curSetFlags[i];
-        }
 
         u->size = sum;
-
     }
 
     return set;

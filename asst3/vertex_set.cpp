@@ -15,48 +15,21 @@ VertexSetType setType(Graph g, VertexSet* set)
 {
 
   if((unsigned int)set->size==num_nodes(g)){
-    //printf("pagerank!\n");
     return PAGERANK;
   }
 
-//   if((unsigned int)set->size<=Ratio*num_nodes(g)){
-//     printf("Sparse!\n");
-//     return SPARSE;
-//   }else{
-//     printf("dense!\n");
-//     return DENSE;
-//   }
+  unsigned int outEdges = 0;
+  unsigned int inEdges = 0;
 
+  outEdges = set->size;
+  inEdges= SparseRatio*num_edges(g);
 
-//  if((unsigned int)set->size>=Ratio*num_nodes(g)){
-//    printf("Dense!\n");
-//     return DENSE;
-  //}else {
-
-
-    unsigned int outEdges = 0;
-    unsigned int inEdges = 0;
-//#pragma omp parallel for reduction(+:outEdges) schedule(static)
-//    for (int i = 0; i < set->numNodes; i++) {
-//      if (set->curSetFlags[i] == 1)
-//        outEdges += outgoing_size(g, i);
-//    }
-//    if(outEdges<0){
-//      printf("negative outEdge=%y! return dense\n",outEdges);
-//      return DENSE;
-//    }
-    outEdges = set->size;
-    inEdges= SparseRatio*num_edges(g);
-    if (inEdges > outEdges) {
-      //printf("indEdge= %u > outEdge= %u Sparse!\n",inEdges,outEdges);
-      return SPARSE; //top down
-    }
-    else {
-      //printf("indEdge= %u <outEdge= %u dense!\n",inEdges,outEdges);
-      return DENSE; //bottom up
-    }
-
-
+  if (inEdges > outEdges) {
+    return SPARSE; //top down
+  }
+  else {
+    return DENSE; //bottom up
+  }
 }
 
 /**
@@ -75,9 +48,8 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
   vertexSet->numNodes = numNodes;
   vertexSet->type = type;
 
-  //vertexSet->visited = (bool *)malloc(numNodes*numNodes * sizeof(bool));//used by bfs / kbfs?
   vertexSet->curSetFlags = (bool *)malloc(numNodes * sizeof(bool));
-#pragma omp parallel for
+  #pragma omp parallel for
   for (int i=0; i<numNodes; i++) {
     vertexSet->curSetFlags[i] = false;
   }
@@ -87,8 +59,6 @@ VertexSet *newVertexSet(VertexSetType type, int capacity, int numNodes)
 void freeVertexSet(VertexSet *set)
 {
   // TODO: Implement
-
-  //free(set->visited);
   free(set->curSetFlags);
   delete set;
 }
@@ -118,7 +88,7 @@ VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
   // THE ASSIGNMENT
   VertexSet* unionSet = newVertexSet(u->type, u->numNodes, u->numNodes);
 
-#pragma omp parallel for schedule(static)
+  #pragma omp parallel for schedule(static)
   for (int i=0; i<u->numNodes; i++)
   {
     if (u->curSetFlags[i]==true || v->curSetFlags[i]==true)
@@ -126,7 +96,7 @@ VertexSet* vertexUnion(VertexSet *u, VertexSet* v)
   }
 
   int sum = 0;
-#pragma omp parallel for reduction(+:sum)
+  #pragma omp parallel for reduction(+:sum)
   for (int i=0; i<u->numNodes; i++)
   {
     if (unionSet->curSetFlags[i])

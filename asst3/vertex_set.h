@@ -14,8 +14,6 @@ typedef struct {
     int size;     // Number of nodes in the set
     int numNodes; // Number of nodes in the graph
     VertexSetType type;
-    //int k;
-    //bool* visited;
     bool* curSetFlags;
 } VertexSet;
 
