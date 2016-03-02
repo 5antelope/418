@@ -10,6 +10,8 @@
 #include "graph.h"
 #include "graph_internal.h"
 
+#include "CycleTimer.h"
+
 #define NA -1
 #define K 32
 #define WORDSIZE 32
@@ -45,8 +47,17 @@ class RadiiUpdate
       return changed;
     }	
 
-    bool cond(Vertex v) {
-      return true;
+    bool cond(Vertex src,Vertex v) {
+        //return true (need to be added to frontier) if it's source has a different bit map
+        for (int j = 0; j < NUMWORDS; j++) {
+            if (visited[v][j] != visited[src][j]) {
+                return true;
+            }
+        }
+      return false;
+    }
+    bool cond(Vertex v){
+        return true;
     }
 };
 
@@ -146,7 +157,7 @@ void kBFS(graph *g, int *distField) {
   int iter = 0;
 
   // set up globals
-  #pragma omp parallel for schedule(static)
+  #pragma omp parallel for schedule(guided)
   for (int i = 0; i < g->num_nodes; i++)
     distField[i] = NA;
   radii = distField;
@@ -154,31 +165,49 @@ void kBFS(graph *g, int *distField) {
   visited = (int**) malloc(sizeof(int*) * g->num_nodes);
   nextVisited = (int**) malloc(sizeof(int*) * g->num_nodes);
 
+    int* visitedChunk = (int*) malloc(sizeof(int*) * NUMWORDS * g->num_nodes);
+    int * nextVisitedChunk = (int*) malloc(sizeof(int*) * NUMWORDS * g->num_nodes);
+
 #pragma omp parallel for schedule(guided)
-  for (int i = 0; i < g->num_nodes; i++) {
-    visited[i] = (int*) malloc(sizeof(int) * NUMWORDS);
-    nextVisited[i] = (int*) malloc(sizeof(int) * NUMWORDS);
-    memset(visited[i], 0, sizeof(int) * NUMWORDS);
-    memset(nextVisited[i], 0, sizeof(int) * NUMWORDS);
-  }
+    for (int i = 0; i < g->num_nodes; i++) {
+        visited[i] = (int*) (visitedChunk + i);
+        nextVisited[i] =(int*) (nextVisitedChunk + i);
+        memset(visited[i], 0, sizeof(int) * NUMWORDS);
+        memset(nextVisited[i], 0, sizeof(int) * NUMWORDS);
+    }
+//
+//
+//  for (int i = 0; i < g->num_nodes; i++) {
+//    visited[i] = (int*) malloc(sizeof(int) * NUMWORDS);
+//    nextVisited[i] = (int*) malloc(sizeof(int) * NUMWORDS);
+//    memset(visited[i], 0, sizeof(int) * NUMWORDS);
+//    memset(nextVisited[i], 0, sizeof(int) * NUMWORDS);
+//  }
 
 
   // initialize the frontier with K random nodes
   srand(0);
   int numSources = std::min(K, g->num_nodes);
   int S[numSources]; // the set of source nodes
+#pragma omp parallel for schedule(guided)
   for (int i = 0; i < numSources; i++) 
     S[i] = (std::rand()/(float)RAND_MAX) * g->num_nodes;
 
   VertexSet* frontier = newVertexSet(SPARSE, numSources, g->num_nodes);
+  //frontier->k = K;
+
+#pragma omp parallel for schedule(guided)
   for (int i = 0; i < numSources; i++) {
     addVertex(frontier, S[i]);
   }
 
+
   // iterate over values 1 thru k to do initialization
   VertexSet* ks = newVertexSet(SPARSE, numSources, g->num_nodes);
-  for (int i = 0; i < numSources; i++)
+#pragma omp parallel for  schedule(guided)
+  for (int i = 0; i < numSources; i++) 
     addVertex(ks, i);
+
 
   Init i(S, visited, nextVisited, radii);
   vertexMap(ks, i, NORETURN);
@@ -186,24 +215,35 @@ void kBFS(graph *g, int *distField) {
   freeVertexSet(ks);
 
   VertexSet *newFrontier;
-
+    //double minThread = 1e30;
   while (frontier->size > 0) {
+
     iter = iter + 1;
     RadiiUpdate ru(visited, nextVisited, radii, iter);
-    newFrontier = edgeMap(g, frontier, ru);
-
+    //  double startTime = CycleTimer::currentSeconds();
+      newFrontier = edgeMap(g, frontier, ru);
+     // double endTime = CycleTimer::currentSeconds();
+     // minThread = std::min(minThread, endTime - startTime);
+     // printf("[KBFS Iteration %d edgeMap]:\t\t[%.3f] ms\n",iter, minThread * 1000);
     freeVertexSet(frontier);
     frontier = newFrontier;
 
     VisitedCopy vc(visited, nextVisited);
+      //startTime = CycleTimer::currentSeconds();
     vertexMap(frontier, vc, NORETURN);
+      //endTime = CycleTimer::currentSeconds();
+      //minThread = std::min(minThread, endTime - startTime);
+      //printf("[KBFS Iteration %d vertexMap]:\t\t[%.3f] ms\n",iter, minThread * 1000);
   }
 
-  for (int i = 0; i < g->num_nodes; i++) {
-    free(visited[i]);
-    free(nextVisited[i]);
-  }
+//#pragma omp parallel for schedule(guided)
+//  for (int i = 0; i < g->num_nodes; i++) {
+//    free(visited[i]);
+//    free(nextVisited[i]);
+//  }
 
+    free(visitedChunk);
+    free(nextVisitedChunk);
   freeVertexSet(frontier);
   free(visited);
   free(nextVisited);

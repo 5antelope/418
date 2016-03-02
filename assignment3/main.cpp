@@ -126,6 +126,7 @@ void gradeApps(int num_nodes, int num_edges,
         minThreadCount, maxThreadCount,
         graphDecompRefWrapper, graphDecompWrapper,
         compareArrays<int>, runRef, runStu, timing);
+        //compareArraysAndDisplay<int>, runRef, runStu, timing);
   }
 
   /* Timing done */
