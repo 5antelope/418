@@ -49,15 +49,12 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
 
 
     if(type==DENSE){
-        //bottom up
-        //printf("bottom up\n");
     #pragma omp parallel for schedule(guided)
         //loop through all vertexes in Graph, if vertexes' incoming edge is in u, add itself into frontier...
         for (int vertex=0; vertex<g->num_nodes; vertex++){
             //if v has been visited, continue
 
             if(!f.cond(vertex)){
-                //printf("continue1 %d, reject? %d\n",vertex,!f.cond(vertex));
                 continue;
             }
             if(set->curSetFlags[vertex])  //||u->curSetFlags[vertex] TODO why this is not working?
@@ -69,13 +66,10 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
             for (const Vertex* v=start; v!=end; v++)
             {
                 if(!f.cond(*v, vertex)){
-                    // printf("continue2 %d\n",vertex);
                     continue;
                 }
                 if (u->curSetFlags[*v] && f.update(*v, vertex)) {
-                    //printf("added %d\n",vertex);
                     set->curSetFlags[vertex] = true;
-                    //addVertex(set, vertex);
                 }
             }
 
@@ -95,36 +89,24 @@ VertexSet *edgeMap(Graph g, VertexSet *u, F &f, bool removeDuplicates=true)
             {
                 if (u->curSetFlags[*v] && f.update(*v, vertex))
                     set->curSetFlags[vertex] = true;
-                //addVertex(set, vertex);
             }
 
         }
     }else if (type==SPARSE){
         //top down
-        //printf("top down\n");
-
         #pragma omp parallel for schedule(guided)
         for(int i=0; i<g->num_nodes; i++){
             if(!u->curSetFlags[i])
                 continue;
-            //if(set->curSetFlags[i])  //TODO
-              //  continue;
             const Vertex *start = outgoing_begin(g, i);
             const Vertex *end = outgoing_end(g, i);
 
             for (const Vertex *v = start; v != end; v++) {
-//                if(u->curSetFlags[*v]){
-//                    continue;
-//                }
 
                 if (f.cond(i,*v) && f.update(i, *v)) {
                     set->curSetFlags[*v] = true;
-                    //set->visited[*v]=true;
-                    //addVertex(set, *v);
                 }
             }
-
-
         }
     }
 
@@ -168,17 +150,16 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
     if (returnSet)
     {
         set = newVertexSet(u->type, u->numNodes, u->numNodes);
-#pragma omp parallel for schedule(guided)
+        #pragma omp parallel for schedule(guided)
         for (int i=0; i<u->numNodes; i++)
         {
             if (u->curSetFlags[i]==1 && f(i)){
                 set->curSetFlags[i] = true;
-                //addVertex(set, i);
             }
         }
 
         int sum = 0;
-#pragma omp parallel for schedule(static) reduction(+:sum)
+        #pragma omp parallel for schedule(static) reduction(+:sum)
         for (int i=0; i<u->numNodes; i++)
         {
             sum += set->curSetFlags[i];
@@ -188,17 +169,16 @@ VertexSet *vertexMap(VertexSet *u, F &f, bool returnSet=true)
     }
     else
     {
-#pragma omp parallel for schedule(guided)
+    #pragma omp parallel for schedule(guided)
         for (int i=0; i<u->numNodes; i++)
         {
             if (u->curSetFlags[i] && !f(i)){
                 u->curSetFlags[i] = false;
-                //removeVertex(u, i);
             }
         }
 
         int sum = 0;
-#pragma omp parallel for schedule(static) reduction(+:sum)
+    #pragma omp parallel for schedule(static) reduction(+:sum)
         for (int i=0; i<u->numNodes; i++)
         {
             sum += u->curSetFlags[i];

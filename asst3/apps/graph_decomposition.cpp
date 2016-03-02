@@ -1,6 +1,13 @@
 #include "paraGraph.h"
 #include "graph.h"
 #include <stdio.h>
+#include <mutex>
+#include <thread>
+#include <vector>
+#include <iostream>
+#include <atomic>
+#include <semaphore.h>
+
 class Graph_decomposition
 {
 public:
@@ -11,36 +18,37 @@ public:
     int maxId;
     int * updateAtIter;
     int * iter;
+    sem_t* mtx;
 
     Graph_decomposition(Graph g, int* solution, int* dus, int maxVal, int maxId, int* updateAtIter, int* iter)
             : g(g), solution(solution), dus(dus), maxVal(maxVal), maxId(maxId),updateAtIter(updateAtIter), iter(iter)
     {
-#pragma omp parallel for
+        mtx = (sem_t *)malloc(sizeof(sem_t) * num_nodes(g));
+        #pragma omp parallel for
         for (int i = 0; i < num_nodes(g); i++) {
             solution[i] = -1;
             updateAtIter[i]=-1;
+            sem_init(&mtx[i], 0, 1);
         }
         solution[maxId]=maxId;
     }
 
     bool update(Vertex src, Vertex dst) {
-        //printf("update dst=%d, updateAtIter=%d, iter=%d\n",dst, updateAtIter[dst],*iter);
-//        if (distances_[dst] == NA)
-//            return __sync_bool_compare_and_swap(&distances_[dst], NA, currentDistance);
         updateAtIter[dst] = *iter;
-        bool r;
+        bool r = false;
 
+        sem_wait(&mtx[dst]);
 
         if (solution[dst] == -1) {
-            //printf("-1 writting src %d's cluster %d to %d\n", src, solution[src], dst);
-            r= __sync_bool_compare_and_swap(&solution[dst], -1, solution[src]);
+            solution[dst] = solution[src];
+            r = true;
+        }
+        else if (solution[dst] > solution[src]) {
+            solution[dst] = solution[src];
+            r = true;
         }
 
-        if (solution[dst] > solution[src]) {
-            //printf("> writting src %d's cluster %d to %d\n", src, solution[src], dst);
-            r= __sync_bool_compare_and_swap(&solution[dst], solution[dst], solution[src]);
-        }
-        r= true;
+        sem_post(&mtx[dst]);
 
         return r;
     }
@@ -50,7 +58,7 @@ public:
         if(solution[v]==-1) {
             return true;
         }
-        if(solution[v]!=-1&&updateAtIter[v]==*iter) {
+        if(solution[v]!=-1 && updateAtIter[v]==*iter) {
             return true;
         }
         return false;
@@ -82,8 +90,6 @@ void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
     addVertex(frontier,maxId);
 
     int iter=0;
-   // printf("add index %d to be cluster!\n",maxId);
-
 
     Graph_decomposition f( g, decomp, dus, maxVal,  maxId, updateAtIter,  &iter);
 
@@ -91,22 +97,18 @@ void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
 
     while (frontier->size > 0)
     {
-       // printf("iter=%d, frontier->size=%d\n",iter,frontier->size);
         newFrontier = edgeMap<Graph_decomposition>(g, frontier, f);
-        //printf("newFrontier->size=%d\n",newFrontier->size);
-        //printf("iter=%d\n",f.iter);
         freeVertexSet(frontier);
         frontier = newFrontier;
         iter++;
 
-#pragma omp parallel for schedule(guided)
+        #pragma omp parallel for schedule(guided)
         for (int i = 0; i < num_nodes(g); i++)
         {
             if (f.solution[i] == -1)
             {
                 if ((maxVal - dus[i])<iter)
                 {
-                   // printf("grow index %d to be cluster! (maxVal - dus[i])=%d\n",i,(maxVal - dus[i]));
                     newFrontier->curSetFlags[i] = 1;
                     f.solution[i]=i;
                 }
@@ -114,14 +116,11 @@ void decompose(graph *g, int *decomp, int* dus, int maxVal, int maxId) {
         }
 
         int sum = 0;
-#pragma omp parallel for reduction(+:sum)
+        #pragma omp parallel for reduction(+:sum)
         for (int i=0; i<num_nodes(g); i++)
             sum += newFrontier->curSetFlags[i];
 
         newFrontier->size = sum;
-
-//        free(frontier->curSetFlags);
-//        frontier=new_frontier;
     }
 
     free(updateAtIter);
