@@ -5,16 +5,16 @@
 #include <unordered_set>
 
 typedef enum {
-  SPARSE,
-  DENSE,
+    SPARSE,
+    DENSE,
+    PAGERANK,
 } VertexSetType;
 
 typedef struct {
-  int size;     // Number of nodes in the set
-  int numNodes; // Number of nodes in the graph
-  VertexSetType type;
-  Vertex* vertices;
-  bool* curSetFlags;
+    int size;     // Number of nodes in the set
+    int numNodes; // Number of nodes in the graph
+    VertexSetType type;
+    bool* curSetFlags;
 } VertexSet;
 
 VertexSetType setType(const Graph, VertexSet*);
