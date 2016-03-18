@@ -1,6 +1,8 @@
 #include <glog/logging.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <queue>
+#include <map>
 
 #include "server/messages.h"
 #include "server/master.h"
@@ -18,8 +20,16 @@ static struct Master_state {
   int num_pending_client_requests;
   int next_tag;
 
-  Worker_handle my_worker;
-  Client_handle waiting_client;
+  // worker_list keeps track of workers
+  // Worker_handle my_worker;
+  list<Worker_handle> worker_list;
+
+  // client_map maps request to clients by next_tag int
+  // Client_handle waiting_client;
+  map<int, Client_handle> client_map;
+
+  // request_queue buffer requests exceed number of workers
+  queue<Request_msg> request_queue;
 
 } mstate;
 
@@ -41,10 +51,12 @@ void master_node_init(int max_workers, int& tick_period) {
   mstate.server_ready = false;
 
   // fire off a request for a new worker
-
-  int tag = random();
+  // take normal tag number
+  int tag = mstate.next_tag++;
   Request_msg req(tag);
-  req.set_arg("name", "my worker 0");
+  // req.set_arg("name", "my worker 0");
+  req.set_arg("name", "my worker "+tag);
+  
   request_new_worker_node(req);
 
 }
@@ -55,12 +67,14 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
 
-  mstate.my_worker = worker_handle;
+  // mstate.my_worker = worker_handle;
+  mstate.worker_list.push_back(worker_handle);
 
   // Now that a worker is booted, let the system know the server is
   // ready to begin handling client requests.  The test harness will
   // now start its timers and start hitting your server with requests.
-  if (mstate.server_ready == false) {
+  if (mstate.worker_list.size() == mstate.max_num_workers 
+        && mstate.server_ready == false) {
     server_init_complete();
     mstate.server_ready = true;
   }
