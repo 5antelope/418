@@ -7,6 +7,7 @@
 #include "server/messages.h"
 #include "server/master.h"
 
+using namespace std;
 
 static struct Master_state {
 
@@ -109,10 +110,8 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // The provided starter code cannot handle multiple pending client
   // requests.  The server returns an error message, and the checker
   // will mark the response as "incorrect"
-  if (mstate.num_pending_client_requests > 0) {
-    Response_msg resp(0);
-    resp.set_response("Oh no! This server cannot handle multiple outstanding requests!");
-    send_client_response(client_handle, resp);
+  if (mstate.num_pending_client_requests > mstate.max_num_workers) {
+    request_queue.push();
     return;
   }
 
