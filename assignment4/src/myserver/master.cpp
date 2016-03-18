@@ -3,6 +3,7 @@
 #include <stdlib.h>
 #include <queue>
 #include <map>
+#include <vector>
 
 #include "server/messages.h"
 #include "server/master.h"
@@ -20,10 +21,11 @@ static struct Master_state {
   int max_num_workers;
   int num_pending_client_requests;
   int next_tag;
+  int free_worker;
 
   // worker_list keeps track of workers
   // Worker_handle my_worker;
-  list<Worker_handle> worker_list;
+  vector<Worker_handle> worker_list;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
@@ -31,6 +33,9 @@ static struct Master_state {
 
   // request_queue buffer requests exceed number of workers
   queue<Request_msg> request_queue;
+
+  // array indicates which worker is free
+  bool *worker_state;
 
 } mstate;
 
@@ -43,8 +48,12 @@ void master_node_init(int max_workers, int& tick_period) {
   tick_period = 5;
 
   mstate.next_tag = 0;
+  mstate.free_worker = 0;
   mstate.max_num_workers = max_workers;
   mstate.num_pending_client_requests = 0;
+  mstate.worker_state = (bool *)malloc(sizeof(bool) * max_workers);
+  for (int i=0; i<mstate.max_num_workers; i++)
+    mstate.worker_state[i] = true;
 
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
@@ -70,11 +79,12 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
 
   // mstate.my_worker = worker_handle;
   mstate.worker_list.push_back(worker_handle);
+  mstate.free_worker++;
 
   // Now that a worker is booted, let the system know the server is
   // ready to begin handling client requests.  The test harness will
   // now start its timers and start hitting your server with requests.
-  if (mstate.worker_list.size() == mstate.max_num_workers 
+  if (mstate.free_worker == mstate.max_num_workers 
         && mstate.server_ready == false) {
     server_init_complete();
     mstate.server_ready = true;
@@ -88,9 +98,14 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
 
   DLOG(INFO) << "Master received a response from a worker: [" << resp.get_tag() << ":" << resp.get_response() << "]" << std::endl;
 
-  send_client_response(mstate.waiting_client, resp);
-
-  mstate.num_pending_client_requests = 0;
+  int tag = resp.get_tag();
+  map<int, Worker_handle>::iterator itr = mstate.client_map.find(tag);
+  if (itr != mstate.client_map.end()) {
+    Client_handle client = itr->second;
+    send_client_response(client, resp);
+    mstate.num_pending_client_requests--;
+    check_request_queue();
+  }
 }
 
 void handle_client_request(Client_handle client_handle, const Request_msg& client_req) {
@@ -124,9 +139,22 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // Fire off the request to the worker.  Eventually the worker will
   // respond, and your 'handle_worker_response' event handler will be
   // called to forward the worker's response back to the server.
+
+  // create tag-client map
   int tag = mstate.next_tag++;
+  mstate.client_map.insert ( std::pair<int, Client_handle>(tag, client_handle) );
+
+  // create request for worker
   Request_msg worker_req(tag, client_req);
-  send_request_to_worker(mstate.my_worker, worker_req);
+
+  if (mstate.num_pending_client_requests <= mstate.max_num_workers) {
+    Worker_handle worker = find_free_worker();
+    send_request_to_worker(worker, worker_req);
+    assign_worker_complete(worker);
+  }
+  else {
+    mstate.request_queue.push(worker_req);
+  }
 
   // We're done!  This event handler now returns, and the master
   // process calls another one of your handlers when action is
@@ -134,6 +162,34 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
 
 }
 
+Worker_handle find_free_worker() {
+  Worker_handle worker = null;
+  int idx;
+  for (idx=0; idx<mstate.max_num_workers; idx++) {
+    if (mstate.worker_state[i])
+      break;
+  }
+  worker = mstate.worker_list.at(idx);
+  return worker;
+}
+
+void assign_worker_complete(Worker_handle worker) {
+  int idx = find(mstate.worker_list.begin(), mstate.worker_list.end(), worker) - mstate.worker_list.begin();
+
+  // reset state to be false (busy)
+  mstate.worker_state[idx] = false;
+}
+
+// check request message queue, send first one to worker
+void check_request_queue() {
+  if (mstate.request_queue.size() == 0)
+    return;
+  Request_msg = mstate.request_queue.pop();
+
+  Worker_handle worker = find_free_worker();
+  send_request_to_worker(worker, worker_req);
+  assign_worker_complete(worker);
+}
 
 void handle_tick() {
 
