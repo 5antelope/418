@@ -1,0 +1,52 @@
+Log file created at: 2016/03/17 17:33:55
+Running on machine: ghc41.ghc.andrew.cmu.edu
+Log line format: [IWEF]mmdd hh:mm:ss.uuuuuu threadid file:line] msg
+I0317 17:33:55.335613  1655 main_loop.cpp:73] Requesting worker name=my worker 0;tag=1804289383
+I0317 17:33:56.846456  1655 master.cpp:83] Received request: cmd=418wisdom;x=84443
+I0317 17:33:56.913175  1655 master.cpp:83] Received request: cmd=418wisdom;x=75796
+I0317 17:33:57.023289  1655 master.cpp:83] Received request: cmd=418wisdom;x=42057
+I0317 17:33:57.094333  1655 master.cpp:83] Received request: cmd=418wisdom;x=25891
+I0317 17:33:57.126132  1655 master.cpp:83] Received request: cmd=418wisdom;x=51127
+I0317 17:33:57.236318  1655 master.cpp:83] Received request: cmd=418wisdom;x=40493
+I0317 17:33:57.307323  1655 master.cpp:83] Received request: cmd=418wisdom;x=78380
+I0317 17:33:57.378336  1655 master.cpp:83] Received request: cmd=418wisdom;x=30331
+I0317 17:33:57.449317  1655 master.cpp:83] Received request: cmd=418wisdom;x=47660
+I0317 17:33:57.520340  1655 master.cpp:83] Received request: cmd=418wisdom;x=58338
+I0317 17:33:57.591330  1655 master.cpp:83] Received request: cmd=418wisdom;x=90812
+I0317 17:33:57.662336  1655 master.cpp:83] Received request: cmd=418wisdom;x=50469
+I0317 17:33:57.733342  1655 master.cpp:83] Received request: cmd=418wisdom;x=28184
+I0317 17:33:57.804322  1655 master.cpp:83] Received request: cmd=418wisdom;x=75581
+I0317 17:33:57.875322  1655 master.cpp:83] Received request: cmd=418wisdom;x=61837
+I0317 17:33:57.946333  1655 master.cpp:83] Received request: cmd=418wisdom;x=25050
+I0317 17:33:58.017326  1655 master.cpp:83] Received request: cmd=418wisdom;x=90975
+I0317 17:33:58.042608  1655 master.cpp:74] Master received a response from a worker: [0:Come to lecture, there might be donuts!]
+I0317 17:33:58.048956  1655 master.cpp:83] Received request: cmd=418wisdom;x=98279
+I0317 17:33:58.159323  1655 master.cpp:83] Received request: cmd=418wisdom;x=81022
+I0317 17:33:58.230332  1655 master.cpp:83] Received request: cmd=418wisdom;x=90217
+I0317 17:33:58.301333  1655 master.cpp:83] Received request: cmd=418wisdom;x=31015
+I0317 17:33:58.372324  1655 master.cpp:83] Received request: cmd=418wisdom;x=72983
+I0317 17:33:58.443341  1655 master.cpp:83] Received request: cmd=418wisdom;x=89884
+I0317 17:33:58.514355  1655 master.cpp:83] Received request: cmd=418wisdom;x=68399
+I0317 17:33:58.585319  1655 master.cpp:83] Received request: cmd=418wisdom;x=47214
+I0317 17:33:58.656327  1655 master.cpp:83] Received request: cmd=418wisdom;x=10070
+I0317 17:33:58.727331  1655 master.cpp:83] Received request: cmd=418wisdom;x=43417
+I0317 17:33:58.798331  1655 master.cpp:83] Received request: cmd=418wisdom;x=61089
+I0317 17:33:58.869325  1655 master.cpp:83] Received request: cmd=418wisdom;x=91302
+I0317 17:33:58.940343  1655 master.cpp:83] Received request: cmd=418wisdom;x=96661
+I0317 17:33:59.011345  1655 master.cpp:83] Received request: cmd=418wisdom;x=47701
+I0317 17:33:59.082319  1655 master.cpp:83] Received request: cmd=418wisdom;x=86531
+I0317 17:33:59.153324  1655 master.cpp:83] Received request: cmd=418wisdom;x=26049
+I0317 17:33:59.224340  1655 master.cpp:83] Received request: cmd=418wisdom;x=80503
+I0317 17:33:59.285310  1655 master.cpp:74] Master received a response from a worker: [1:You will perform amazingly on exam 2]
+I0317 17:33:59.295338  1655 master.cpp:83] Received request: cmd=418wisdom;x=54870
+I0317 17:33:59.326936  1655 master.cpp:83] Received request: cmd=418wisdom;x=1404
+I0317 17:33:59.437338  1655 master.cpp:83] Received request: cmd=418wisdom;x=71971
+I0317 17:33:59.508343  1655 master.cpp:83] Received request: cmd=418wisdom;x=39882
+I0317 17:33:59.579325  1655 master.cpp:83] Received request: cmd=418wisdom;x=82485
+I0317 17:33:59.650312  1655 master.cpp:83] Received request: cmd=418wisdom;x=66815
+I0317 17:33:59.721289  1655 master.cpp:83] Received request: cmd=418wisdom;x=114
+I0317 17:33:59.792328  1655 master.cpp:83] Received request: cmd=418wisdom;x=49358
+I0317 17:33:59.863314  1655 master.cpp:83] Received request: cmd=418wisdom;x=86761
+I0317 17:33:59.934320  1655 master.cpp:83] Received request: cmd=418wisdom;x=24391
+I0317 17:34:00.531301  1655 master.cpp:74] Master received a response from a worker: [2:Worse is better. Keep it simple...]
+I0317 17:34:00.540468  1655 main_loop.cpp:138] Shutting down
