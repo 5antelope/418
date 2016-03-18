@@ -40,6 +40,34 @@ static struct Master_state {
 } mstate;
 
 
+Worker_handle find_free_worker() {
+  Worker_handle worker = null;
+  int idx;
+  for (idx=0; idx<mstate.max_num_workers; idx++) {
+    if (mstate.worker_state[i])
+      break;
+  }
+  worker = mstate.worker_list.at(idx);
+  return worker;
+}
+
+void assign_worker_complete(Worker_handle worker) {
+  int idx = find(mstate.worker_list.begin(), mstate.worker_list.end(), worker) - mstate.worker_list.begin();
+
+  // reset state to be false (busy)
+  mstate.worker_state[idx] = false;
+}
+
+// check request message queue, send first one to worker
+void check_request_queue() {
+  if (mstate.request_queue.size() == 0)
+    return;
+  Request_msg = mstate.request_queue.pop();
+
+  Worker_handle worker = find_free_worker();
+  send_request_to_worker(worker, worker_req);
+  assign_worker_complete(worker);
+}
 
 void master_node_init(int max_workers, int& tick_period) {
 
@@ -160,35 +188,6 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // process calls another one of your handlers when action is
   // required.
 
-}
-
-Worker_handle find_free_worker() {
-  Worker_handle worker = null;
-  int idx;
-  for (idx=0; idx<mstate.max_num_workers; idx++) {
-    if (mstate.worker_state[i])
-      break;
-  }
-  worker = mstate.worker_list.at(idx);
-  return worker;
-}
-
-void assign_worker_complete(Worker_handle worker) {
-  int idx = find(mstate.worker_list.begin(), mstate.worker_list.end(), worker) - mstate.worker_list.begin();
-
-  // reset state to be false (busy)
-  mstate.worker_state[idx] = false;
-}
-
-// check request message queue, send first one to worker
-void check_request_queue() {
-  if (mstate.request_queue.size() == 0)
-    return;
-  Request_msg = mstate.request_queue.pop();
-
-  Worker_handle worker = find_free_worker();
-  send_request_to_worker(worker, worker_req);
-  assign_worker_complete(worker);
 }
 
 void handle_tick() {
