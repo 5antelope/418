@@ -39,12 +39,15 @@ static struct Master_state {
 
 // check request message queue, send first one to worker
 void check_request_queue() {
-  if (mstate.request_queue.size() == 0)
+  if (mstate.request_queue.size() == 0) {
+    DLOG(INFO) << "Request queue is empty " << std::endl;
     return;
+  }
 
   // pick a reqeust and a worker
   Request_msg worker_req = mstate.request_queue.front();
 
+  DLOG(INFO) << "Free worker queue size: " << mstate.free_worker_list.size() << std::endl;
   Worker_handle worker = mstate.free_worker_list.front();
 
   send_request_to_worker(worker, worker_req);
@@ -87,11 +90,10 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // 'tag' allows you to identify which worker request this response
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
-  printf("asdf\n");
-  // mstate.my_worker = worker_handle;
   mstate.free_worker_list.push(worker_handle);
-  printf("j;kl\n");
   mstate.free_worker++;
+  mstate.worker_count++;
+  DLOG(INFO) << "worker: " << mstate.worker_count << std::endl;
 
   // Now that a worker is booted, let the system know the server is
   // ready to begin handling client requests.  The test harness will
@@ -166,17 +168,10 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
     return;
   }
 
-  // if (mstate.num_pending_client_requests <= mstate.max_num_workers) {
-  //   Worker_handle worker = find_free_worker();
-  //   send_request_to_worker(worker, worker_req);
-  //   assign_worker_complete(worker);
-  // }
-  // else {
   mstate.request_queue.push(worker_req);
-  if (mstate.num_pending_client_requests <= mstate.max_num_workers) {
+  if (mstate.free_worker_list.size() > 0) {
     check_request_queue();
   }
-  // }
 
   // We're done!  This event handler now returns, and the master
   // process calls another one of your handlers when action is
