@@ -76,12 +76,14 @@ void master_node_init(int max_workers, int& tick_period) {
 
   // fire off a request for a new worker
   // take normal tag number
-  int tag = mstate.next_tag++;
-  Request_msg req(tag);
-  // req.set_arg("name", "my worker 0");
-  req.set_arg("name", "my worker "+tag);
+  for (int i=0; i<max_workers; i++) {
+    int tag = mstate.next_tag++;
+    Request_msg req(tag);
+    // req.set_arg("name", "my worker 0");
+    req.set_arg("name", "my worker "+tag);
 
-  request_new_worker_node(req);
+    request_new_worker_node(req);
+  }
 
 }
 
