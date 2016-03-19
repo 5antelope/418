@@ -89,3 +89,5 @@ clean:
 cleanlogs:
 	rm -rf $(LOGDIR) latedays.qsub.*
 
+cleanall:
+	rm -rf $(OBJDIR) $(DEPDIR) $(LOGDIR) master worker *.pyc
