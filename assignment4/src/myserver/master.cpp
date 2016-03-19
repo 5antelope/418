@@ -26,7 +26,7 @@ static struct Master_state {
 
   // worker_list keeps track of workers
   // Worker_handle my_worker;
-  queue<Worker_handle> *free_worker_list;
+  queue<Worker_handle> free_worker_list;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
@@ -49,9 +49,7 @@ void check_request_queue() {
 
   send_request_to_worker(worker, worker_req);
 
-  // if everything ok, remove first element
   mstate.request_queue.pop();
-
   mstate.free_worker_list.pop();
 }
 
@@ -89,9 +87,10 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // 'tag' allows you to identify which worker request this response
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
-
+  printf("asdf\n");
   // mstate.my_worker = worker_handle;
-  mstate.free_worker_list.push_back(worker_handle);
+  mstate.free_worker_list.push(worker_handle);
+  printf("j;kl\n");
   mstate.free_worker++;
 
   // Now that a worker is booted, let the system know the server is
@@ -120,7 +119,7 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
     // clear number of pening client request and
     // add a free worker to queue to use
     mstate.num_pending_client_requests--;
-    mstate.free_worker_list.push_back(worker_handle);
+    mstate.free_worker_list.push(worker_handle);
 
     check_request_queue();
   }
