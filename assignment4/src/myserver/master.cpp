@@ -26,7 +26,7 @@ static struct Master_state {
 
   // worker_list keeps track of workers
   // Worker_handle my_worker;
-  Worker_handle *worker_list;
+  queue<Worker_handle> *free_worker_list;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
@@ -35,47 +35,24 @@ static struct Master_state {
   // request_queue buffer requests exceed number of workers
   queue<Request_msg> request_queue;
 
-  // array indicates which worker is free
-  bool *worker_state;
-
 } mstate;
-
-
-Worker_handle find_free_worker() {
-  Worker_handle worker = NULL;
-  int idx;
-  for (idx=0; idx<mstate.max_num_workers; idx++) {
-    if (mstate.worker_state[idx])
-      break;
-  }
-  worker = mstate.worker_list[idx];
-  return worker;
-}
-
-void assign_worker_complete(Worker_handle worker) {
-  int idx;
-  for (idx = 0; idx<mstate.max_num_workers; idx++) {
-    if (mstate.worker_list[idx]==worker) {
-        break;
-    }
-  }
-
-  // reset state to be false (busy)
-  mstate.worker_state[idx] = false;
-}
 
 // check request message queue, send first one to worker
 void check_request_queue() {
   if (mstate.request_queue.size() == 0)
     return;
+
+  // pick a reqeust and a worker
   Request_msg worker_req = mstate.request_queue.front();
 
-  Worker_handle worker = find_free_worker();
+  Worker_handle worker = mstate.free_worker_list.front();
+
   send_request_to_worker(worker, worker_req);
-  assign_worker_complete(worker);
 
   // if everything ok, remove first element
   mstate.request_queue.pop();
+
+  mstate.free_worker_list.pop();
 }
 
 void master_node_init(int max_workers, int& tick_period) {
@@ -89,10 +66,7 @@ void master_node_init(int max_workers, int& tick_period) {
   mstate.worker_count = 0;
   mstate.max_num_workers = max_workers;
   mstate.num_pending_client_requests = 0;
-  mstate.worker_list = (Worker_handle *)malloc(sizeof(Worker_handle) * max_workers);
-  mstate.worker_state = (bool *)malloc(sizeof(bool) * max_workers);
-  for (int i=0; i<mstate.max_num_workers; i++)
-    mstate.worker_state[i] = true;
+  // mstate.worker_list = (Worker_handle *)malloc(sizeof(Worker_handle) * max_workers);
 
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
@@ -117,7 +91,7 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // worker request, we don't use it here.
 
   // mstate.my_worker = worker_handle;
-  mstate.worker_list[mstate.worker_count++] = worker_handle;
+  mstate.free_worker_list.push_back(worker_handle);
   mstate.free_worker++;
 
   // Now that a worker is booted, let the system know the server is
@@ -139,9 +113,15 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
   int tag = resp.get_tag();
   map<int, Worker_handle>::iterator itr = mstate.client_map.find(tag);
   if (itr != mstate.client_map.end()) {
+    // find which client needs response
     Client_handle client = itr->second;
     send_client_response(client, resp);
+
+    // clear number of pening client request and
+    // add a free worker to queue to use
     mstate.num_pending_client_requests--;
+    mstate.free_worker_list.push_back(worker_handle);
+
     check_request_queue();
   }
 }
