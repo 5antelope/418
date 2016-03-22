@@ -8,6 +8,7 @@
 #include "server/messages.h"
 #include "server/worker.h"
 #include "tools/cycle_timer.h"
+#include "tools/work_queue.h"
 
 #define DEBUG
 
@@ -16,7 +17,7 @@ using namespace std;
 static const int NUM_THREADS = 24;
 
 // request_queue: queue all requests sent to this worker
-static queue<Request_msg> request_queue;
+static WorkQueue<Request_msg> request_queue;
 
 void *routine(void*);
 void worker_process_request(const Request_msg& req);
@@ -80,11 +81,8 @@ void *routine(void *args) {
   // The routine of worker thread: take a request from queue and
   // process. When the process finishes, remove the request from queue.
   while(1) {
-    if (!request_queue.empty()) {
-      Request_msg request = request_queue.front();
-      worker_process_request(request);
-      request_queue.pop();
-    }
+    Request_msg request = request_queue.get_work();
+    worker_process_request(request);
   }
 
   DLOG(INFO) << "CREATE ALL THREADS FOR POLL" << std::endl;
@@ -93,7 +91,7 @@ void *routine(void *args) {
 void worker_handle_request(const Request_msg& req) {
 
   // put all requests to a queue, wait worker threads to process
-  request_queue.push(req);
+  request_queue.put_work(req);
 
 }
 
