@@ -1,13 +1,20 @@
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <assert.h>
 #include <sstream>
+#include <queue>
 #include <glog/logging.h>
 
 #include "server/messages.h"
 #include "server/worker.h"
 #include "tools/cycle_timer.h"
+
+#define NUM_THREADS = 24
+
+#define DEBUG
+
+// request_queue: queue all requests sent to this worker
+static queue<Request_msg> request_queue;
 
 // Generate a valid 'countprimes' request dictionary from integer 'n'
 static void create_computeprimes_req(Request_msg& req, int n) {
@@ -45,7 +52,6 @@ static void execute_compareprimes(const Request_msg& req, Response_msg& resp) {
       resp.set_response("There are more primes in second range.");
 }
 
-
 void worker_node_init(const Request_msg& params) {
 
   // This is your chance to initialize your worker.  For example, you
@@ -54,10 +60,36 @@ void worker_node_init(const Request_msg& params) {
   // processes will run on an instance with a dual-core CPU.
 
   DLOG(INFO) << "**** Initializing worker: " << params.get_arg("name") << " ****\n";
+  
+  pthread_t poll[NUM_THREADS];
 
+  for (int i=0; i<NUM_THREADS; i++) {
+    pthread_create(&poll[i], NULL, routine, NULL);
+    pthread_detach(poll[i]);
+  }
+}
+
+void routine() {
+
+  // The routine of worker thread: take a request from queue and 
+  // process. When the process finishes, remove the request from queue.
+  while(1) {
+    if (!request_queue.empty()) {
+      Request_msg reqeust = request_queue.front();
+      worker_process_request(*request);
+      request_queue.pop();
+    }
+  }
 }
 
 void worker_handle_request(const Request_msg& req) {
+
+  // put all requests to a queue, wait worker threads to process
+  request_queue.push(*req);
+
+}
+
+void worker_process_request(const Request_msg& req) {
 
   // Make the tag of the reponse match the tag of the request.  This
   // is a way for your master to match worker responses to requests.
@@ -65,9 +97,11 @@ void worker_handle_request(const Request_msg& req) {
 
   // Output debugging help to the logs (in a single worker node
   // configuration, this would be in the log logs/worker.INFO)
+  #ifdef DEBUG
   DLOG(INFO) << "Worker got request: [" << req.get_tag() << ":" << req.get_request_string() << "]\n";
 
   double startTime = CycleTimer::currentSeconds();
+  #endif
 
   if (req.get_arg("cmd").compare("compareprimes") == 0) {
 
@@ -86,8 +120,10 @@ void worker_handle_request(const Request_msg& req) {
 
   }
 
+  #ifdef DEBUG
   double dt = CycleTimer::currentSeconds() - startTime;
   DLOG(INFO) << "Worker completed work in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
+  #endif
 
   // send a response string to the master
   worker_send_response(resp);

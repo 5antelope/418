@@ -22,11 +22,11 @@ static struct Master_state {
   int num_pending_client_requests;
   int next_tag;
   int free_worker;
-  int worker_count;
+  int num_workers;
 
   // worker_list keeps track of workers
   // Worker_handle my_worker;
-  queue<Worker_handle> free_worker_list;
+  vector<Worker_handle> worker_list;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
@@ -37,37 +37,17 @@ static struct Master_state {
 
 } mstate;
 
-// check request message queue, send first one to worker
-void check_request_queue() {
-  if (mstate.request_queue.size() == 0) {
-    DLOG(INFO) << "Request queue is empty " << std::endl;
-    return;
-  }
-
-  // pick a reqeust and a worker
-  Request_msg worker_req = mstate.request_queue.front();
-
-  DLOG(INFO) << "Free worker queue size: " << mstate.free_worker_list.size() << std::endl;
-  Worker_handle worker = mstate.free_worker_list.front();
-
-  send_request_to_worker(worker, worker_req);
-
-  mstate.request_queue.pop();
-  mstate.free_worker_list.pop();
-}
-
 void master_node_init(int max_workers, int& tick_period) {
 
   // set up tick handler to fire every 5 seconds. (feel free to
   // configure as you please)
-  tick_period = 5;
+  tick_period = 1;
 
   mstate.next_tag = 0;
   mstate.free_worker = 0;
-  mstate.worker_count = 0;
+  mstate.num_workers = 0;
   mstate.max_num_workers = max_workers;
   mstate.num_pending_client_requests = 0;
-  // mstate.worker_list = (Worker_handle *)malloc(sizeof(Worker_handle) * max_workers);
 
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
@@ -92,10 +72,10 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // 'tag' allows you to identify which worker request this response
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
-  mstate.free_worker_list.push(worker_handle);
+  mstate.worker_list.push_back(worker_handle);
   mstate.free_worker++;
-  mstate.worker_count++;
-  DLOG(INFO) << "worker: " << mstate.worker_count << std::endl;
+  mstate.num_workers++;
+  DLOG(INFO) << "worker: " << mstate.num_workers << std::endl;
 
   // Now that a worker is booted, let the system know the server is
   // ready to begin handling client requests.  The test harness will
@@ -123,7 +103,6 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
     // clear number of pening client request and
     // add a free worker to queue to use
     mstate.num_pending_client_requests--;
-    mstate.free_worker_list.push(worker_handle);
 
     check_request_queue();
   }
@@ -171,9 +150,6 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   }
 
   mstate.request_queue.push(worker_req);
-  if (mstate.free_worker_list.size() > 0) {
-    check_request_queue();
-  }
 
   // We're done!  This event handler now returns, and the master
   // process calls another one of your handlers when action is
@@ -186,6 +162,21 @@ void handle_tick() {
   // TODO: you may wish to take action here.  This method is called at
   // fixed time intervals, according to how you set 'tick_period' in
   // 'master_node_init'.
+
+  if (mstate.request_queue.size() == 0) {
+    DLOG(INFO) << "Request queue is empty " << std::endl;
+    return;
+  }
+
+  // pick a reqeust and a worker
+  Request_msg worker_req = mstate.request_queue.front();
+
+  int random = rand() % num_workers; 
+  Worker_handle worker = mstate.worker_list.at(random);
+
+  send_request_to_worker(worker, worker_req);
+
+  mstate.request_queue.pop();
 
 }
 
