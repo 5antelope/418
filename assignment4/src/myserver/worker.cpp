@@ -72,6 +72,7 @@ void worker_node_init(const Request_msg& params) {
     pthread_create(&poll[i], NULL, routine, NULL);
     pthread_detach(poll[i]);
   }
+
 }
 
 void *routine(void *args) {
@@ -85,6 +86,8 @@ void *routine(void *args) {
       request_queue.pop();
     }
   }
+
+  DLOG(INFO) << "CREATE ALL THREADS FOR POLL" << std::endl;
 }
 
 void worker_handle_request(const Request_msg& req) {

@@ -114,6 +114,7 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // You can assume that traces end with this special message.  It
   // exists because it might be useful for debugging to dump
   // information about the entire run here: statistics, etc.
+
   if (client_req.get_arg("cmd") == "lastrequest") {
     Response_msg resp(0);
     resp.set_response("ack");
