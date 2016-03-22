@@ -104,7 +104,6 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
     // add a free worker to queue to use
     mstate.num_pending_client_requests--;
 
-    check_request_queue();
   }
 }
 
@@ -171,7 +170,7 @@ void handle_tick() {
   // pick a reqeust and a worker
   Request_msg worker_req = mstate.request_queue.front();
 
-  int random = rand() % num_workers; 
+  int random = rand() % mstate.num_workers;
   Worker_handle worker = mstate.worker_list.at(random);
 
   send_request_to_worker(worker, worker_req);

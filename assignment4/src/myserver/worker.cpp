@@ -9,12 +9,17 @@
 #include "server/worker.h"
 #include "tools/cycle_timer.h"
 
-#define NUM_THREADS = 24
-
 #define DEBUG
+
+using namespace std;
+
+static const int NUM_THREADS = 24;
 
 // request_queue: queue all requests sent to this worker
 static queue<Request_msg> request_queue;
+
+void *routine(void*);
+void worker_process_request(const Request_msg& req);
 
 // Generate a valid 'countprimes' request dictionary from integer 'n'
 static void create_computeprimes_req(Request_msg& req, int n) {
@@ -60,7 +65,7 @@ void worker_node_init(const Request_msg& params) {
   // processes will run on an instance with a dual-core CPU.
 
   DLOG(INFO) << "**** Initializing worker: " << params.get_arg("name") << " ****\n";
-  
+
   pthread_t poll[NUM_THREADS];
 
   for (int i=0; i<NUM_THREADS; i++) {
@@ -69,14 +74,14 @@ void worker_node_init(const Request_msg& params) {
   }
 }
 
-void routine() {
+void *routine(void *args) {
 
-  // The routine of worker thread: take a request from queue and 
+  // The routine of worker thread: take a request from queue and
   // process. When the process finishes, remove the request from queue.
   while(1) {
     if (!request_queue.empty()) {
-      Request_msg reqeust = request_queue.front();
-      worker_process_request(*request);
+      Request_msg request = request_queue.front();
+      worker_process_request(request);
       request_queue.pop();
     }
   }
@@ -85,7 +90,7 @@ void routine() {
 void worker_handle_request(const Request_msg& req) {
 
   // put all requests to a queue, wait worker threads to process
-  request_queue.push(*req);
+  request_queue.push(req);
 
 }
 
