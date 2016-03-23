@@ -14,7 +14,7 @@
 
 using namespace std;
 
-static const int NUM_THREADS = 36;
+static const int NUM_THREADS = 24;
 
 // request_queue: queue all requests sent to this worker
 static WorkQueue<Request_msg> request_queue;
@@ -87,7 +87,7 @@ void *routine(void *arg) {
     Request_msg request = request_queue.get_work();
     worker_process_request(request);
 
-    DLOG(INFO) << "*** " + to_string(pid) + " is processing ***\n";
+    DLOG(INFO) << "*** " + to_string(pid) + " is processing " + to_string(request.get_tag()) + " ***\n";
   }
 
   return NULL;
@@ -133,7 +133,12 @@ void worker_process_request(const Request_msg& req) {
 
   #ifdef DEBUG
   double dt = CycleTimer::currentSeconds() - startTime;
-  DLOG(INFO) << "Worker completed work in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
+  if (req.get_arg("cmd").compare("compareprimes") == 0) {
+    DLOG(INFO) << "Worker completed work (compareprimes) in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
+  }
+  else {
+    DLOG(INFO) << "Worker completed work (execute_work) in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
+  }
   #endif
 
   // send a response string to the master

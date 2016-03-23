@@ -35,9 +35,6 @@ static struct Master_state {
   // Client_handle waiting_client;
   map<int, Client_handle> client_map;
 
-  // request_queue buffer requests exceed number of workers
-  queue<Request_msg> request_queue;
-
   // map worker to corresponding index
   map<Worker_handle, int> worker_map;
 
@@ -165,12 +162,14 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // create request for worker
   Request_msg worker_req(tag, client_req);
 
-  if (mstate.num_pending_client_requests > mstate.max_num_workers) {
-    mstate.request_queue.push(worker_req);
-    return;
-  }
+  // round-robin
+  Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
+  mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
+  mstate.index++;
 
-  mstate.request_queue.push(worker_req);
+  DLOG(INFO) << "Index = " << mstate.index << std::endl;
+
+  send_request_to_worker(worker, worker_req);
 
   // We're done!  This event handler now returns, and the master
   // process calls another one of your handlers when action is
@@ -198,31 +197,11 @@ void handle_tick() {
 
         mstate.worker_map.erase(worker);
         // only kill one node every time
+
+        DLOG(INFO) << "Kill a worker" << std::endl;
         break;
       }
     }
-  }
-
-
-  if (mstate.request_queue.size() == 0) {
-    DLOG(INFO) << "Request queue is empty " << std::endl;
-    return;
-  }
-
-  while (mstate.request_queue.size()>0) {
-    // pick a reqeust and a worker
-    Request_msg worker_req = mstate.request_queue.front();
-
-    // int random = rand() % mstate.num_workers;
-    Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
-    mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
-    mstate.index++;
-
-    DLOG(INFO) << "Index = " << mstate.index << std::endl;
-
-    send_request_to_worker(worker, worker_req);
-
-    mstate.request_queue.pop();
   }
 
 }
