@@ -163,6 +163,7 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   Request_msg worker_req(tag, client_req);
 
   // round-robin
+  // Worker_handle worker = mstate.worker_list.at(rand()  % mstate.num_workers);
   Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
   mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
   mstate.index++;

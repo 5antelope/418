@@ -14,7 +14,7 @@
 
 using namespace std;
 
-static const int NUM_THREADS = 24;
+static const int NUM_THREADS = 30;
 
 // request_queue: queue all requests sent to this worker
 static WorkQueue<Request_msg> request_queue;
@@ -84,10 +84,11 @@ void *routine(void *arg) {
   // The routine of worker thread: take a request from queue and
   // process. When the process finishes, remove the request from queue.
   while(1) {
+
     Request_msg request = request_queue.get_work();
+
     worker_process_request(request);
 
-    DLOG(INFO) << "*** " + to_string(pid) + " is processing " + to_string(request.get_tag()) + " ***\n";
   }
 
   return NULL;
