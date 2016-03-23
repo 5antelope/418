@@ -24,7 +24,6 @@ static struct Master_state {
 } mstate;
 
 
-
 void master_node_init(int max_workers, int& tick_period) {
 
   // set up tick handler to fire every 5 seconds. (feel free to

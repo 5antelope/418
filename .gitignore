@@ -1,4 +1,4 @@
-<<<<<<< HEAD
+
 # Compiled Object files
 *.slo
 *.lo
@@ -31,9 +31,12 @@
 # upload/download file
 download.sh
 upload.sh
-=======
+
+.idea/*
+*/.idea/*
+
 *.swp
 paraGraph
 objs/
 jobs/*.job
->>>>>>> d3e4183f0a1bd7214f9b716ed71053c66e6c4735
+
