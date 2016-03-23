@@ -209,19 +209,21 @@ void handle_tick() {
     return;
   }
 
-  // pick a reqeust and a worker
-  Request_msg worker_req = mstate.request_queue.front();
+  while (mstate.request_queue.size()>0) {
+    // pick a reqeust and a worker
+    Request_msg worker_req = mstate.request_queue.front();
 
-  // int random = rand() % mstate.num_workers;
-  Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
-  mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
-  mstate.index++;
+    // int random = rand() % mstate.num_workers;
+    Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
+    mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
+    mstate.index++;
 
-  DLOG(INFO) << "Index = " << mstate.index << std::endl;
+    DLOG(INFO) << "Index = " << mstate.index << std::endl;
 
-  send_request_to_worker(worker, worker_req);
+    send_request_to_worker(worker, worker_req);
 
-  mstate.request_queue.pop();
+    mstate.request_queue.pop();
+  }
 
 }
 

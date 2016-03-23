@@ -14,7 +14,7 @@
 
 using namespace std;
 
-static const int NUM_THREADS = 24;
+static const int NUM_THREADS = 36;
 
 // request_queue: queue all requests sent to this worker
 static WorkQueue<Request_msg> request_queue;
@@ -70,22 +70,27 @@ void worker_node_init(const Request_msg& params) {
   pthread_t poll[NUM_THREADS];
 
   for (int i=0; i<NUM_THREADS; i++) {
-    pthread_create(&poll[i], NULL, routine, NULL);
+    pthread_create(&poll[i], NULL, routine, new int(i));
     pthread_detach(poll[i]);
   }
 
 }
 
-void *routine(void *args) {
+void *routine(void *arg) {
+
+  int pid = *(int*) arg;
+  delete (int*) arg;
 
   // The routine of worker thread: take a request from queue and
   // process. When the process finishes, remove the request from queue.
   while(1) {
     Request_msg request = request_queue.get_work();
     worker_process_request(request);
+
+    DLOG(INFO) << "*** " + to_string(pid) + " is processing ***\n";
   }
 
-  DLOG(INFO) << "CREATE ALL THREADS FOR POLL" << std::endl;
+  return NULL;
 }
 
 void worker_handle_request(const Request_msg& req) {
