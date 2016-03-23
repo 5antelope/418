@@ -24,9 +24,12 @@ static struct Master_state {
   int free_worker;
   int num_workers;
 
+  int index;
+
   // worker_list keeps track of workers
   // Worker_handle my_worker;
   vector<Worker_handle> worker_list;
+  vector<int> worker_counter;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
@@ -34,6 +37,9 @@ static struct Master_state {
 
   // request_queue buffer requests exceed number of workers
   queue<Request_msg> request_queue;
+
+  // map worker to corresponding index
+  map<Worker_handle, int> worker_map;
 
 } mstate;
 
@@ -49,6 +55,7 @@ void master_node_init(int max_workers, int& tick_period) {
   mstate.max_num_workers = max_workers;
   mstate.num_pending_client_requests = 0;
 
+  mstate.index = 0;
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
   // when 'master_node_init' returnes
@@ -61,7 +68,7 @@ void master_node_init(int max_workers, int& tick_period) {
     Request_msg req(tag);
 
     string name = "my worker" + to_string(tag);
-    req.set_arg("name", "my worker " + name);
+    req.set_arg("name", name);
 
     request_new_worker_node(req);
   }
@@ -73,10 +80,15 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // 'tag' allows you to identify which worker request this response
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
+
+  mstate.worker_map[worker_handle] = mstate.num_workers;
+
   mstate.worker_list.push_back(worker_handle);
+  mstate.worker_counter.push_back(0);
+
   mstate.free_worker++;
   mstate.num_workers++;
-  DLOG(INFO) << "worker: " << mstate.num_workers << std::endl;
+  DLOG(INFO) << "worker: " << mstate.num_workers << " on line" << std::endl;
 
   // Now that a worker is booted, let the system know the server is
   // ready to begin handling client requests.  The test harness will
@@ -105,7 +117,15 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
     // add a free worker to queue to use
     mstate.num_pending_client_requests--;
 
+    // decrease the worker_count for worker_handle
+    map<Worker_handle, int>::iterator worker_idx_itr = mstate.worker_map.find(worker_handle);
+    if (worker_idx_itr != mstate.worker_map.end()) {
+      int pos = worker_idx_itr->second;
+      mstate.worker_counter.at(pos)--;
+    }
+
   }
+
 }
 
 void handle_client_request(Client_handle client_handle, const Request_msg& client_req) {
@@ -164,6 +184,26 @@ void handle_tick() {
   // fixed time intervals, according to how you set 'tick_period' in
   // 'master_node_init'.
 
+  // try to remove workers if there is totally free one
+  if (mstate.num_workers < mstate.max_num_workers) {
+    for (int i=0; i<mstate.num_workers; i++) {
+      if (mstate.worker_counter.at(i)==0) {
+        // kill the worker
+        Worker_handle worker = mstate.worker_list.at(i);
+        kill_worker_node(worker);
+
+        // remove meta data from vectors
+        mstate.worker_counter.erase(mstate.worker_counter.begin() + i);
+        mstate.worker_list.erase(mstate.worker_list.begin() + i);
+
+        mstate.worker_map.erase(worker);
+        // only kill one node every time
+        break;
+      }
+    }
+  }
+
+
   if (mstate.request_queue.size() == 0) {
     DLOG(INFO) << "Request queue is empty " << std::endl;
     return;
@@ -172,8 +212,12 @@ void handle_tick() {
   // pick a reqeust and a worker
   Request_msg worker_req = mstate.request_queue.front();
 
-  int random = rand() % mstate.num_workers;
-  Worker_handle worker = mstate.worker_list.at(random);
+  // int random = rand() % mstate.num_workers;
+  Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
+  mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
+  mstate.index++;
+
+  DLOG(INFO) << "Index = " << mstate.index << std::endl;
 
   send_request_to_worker(worker, worker_req);
 
