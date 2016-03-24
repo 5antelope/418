@@ -29,7 +29,9 @@ static struct Master_state {
 
   //defines a worker to handle the work
   //only one worker so far
-  Worker_handle my_worker;
+  //Worker_handle my_worker;
+  int num_wokers;
+  map<int,Worker_handle> worker_map;
 
   //a queue to store the requests
   map<int,Client_request> client_request_map;
@@ -41,10 +43,11 @@ void master_node_init(int max_workers, int& tick_period) {
 
   // set up tick handler to fire every 5 seconds. (feel free to
   // configure as you please)
-  tick_period = 5;
+  tick_period = 1;
 
   mstate.next_tag = 0;
   mstate.max_num_workers = max_workers;
+  mstate.num_wokers = 0;
 
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
@@ -52,10 +55,9 @@ void master_node_init(int max_workers, int& tick_period) {
   mstate.server_ready = false;
 
   // fire off a request for a new worker
-  int tag = 0;
-
+  int tag = 1;
   Request_msg req(tag);
-  req.set_arg("name", "my worker 0");
+  req.set_arg("name", "my worker 1");
   request_new_worker_node(req);
 
 }
@@ -66,7 +68,9 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
 
-  mstate.my_worker = worker_handle;
+  //mstate.my_worker = worker_handle;
+  mstate.worker_map[mstate.num_wokers] = worker_handle;
+  mstate.num_wokers++;
 
   // Now that a worker is booted, let the system know the server is
   // ready to begin handling client requests.  The test harness will
@@ -119,15 +123,28 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
 
   //send to worker now
   //DLOG(INFO) << "You are the only item in the Queue! process directly" << client_req.get_request_string() << std::endl;
-  send_request_to_worker(mstate.my_worker, worker_req);
+  //Worker_handle worker_handle = mstate.worker_map[tag % mstate.num_wokers];
+  send_request_to_worker(mstate.worker_map[tag % mstate.num_wokers], worker_req);
 }
 
 
+bool is_queue_too_long(){
+  return true;
+}
+
 void handle_tick() {
 
+  if(mstate.num_wokers<mstate.max_num_workers){
+    //if queue is too long? how long? schedule another
+    if(is_queue_too_long()){
+      int tag = mstate.num_wokers+1;
+      Request_msg req(tag);
+      req.set_arg("name", "my worker "+tag);
+      request_new_worker_node(req);
+    }
+  }
   // TODO: you may wish to take action here.  This method is called at
   // fixed time intervals, according to how you set 'tick_period' in
   // 'master_node_init'.
-
 }
 
