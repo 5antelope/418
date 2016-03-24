@@ -14,10 +14,19 @@
 
 using namespace std;
 
-static const int NUM_THREADS = 30;
+static const int NUM_THREADS = 48;
+static const int NUM_NORMAL_QUEUE = 4;
 
 // request_queue: queue all requests sent to this worker
-static WorkQueue<Request_msg> request_queue;
+static WorkQueue<Request_msg> request_queue_0;
+static WorkQueue<Request_msg> request_queue_1;
+static WorkQueue<Request_msg> request_queue_2;
+static WorkQueue<Request_msg> request_queue_3;
+
+// queue for cachefootprint request
+static WorkQueue<Request_msg> request_queue_footprint;
+// queue for arithmetic intensive requests
+static WorkQueue<Request_msg> request_queue_arith;
 
 void *routine(void*);
 void worker_process_request(const Request_msg& req);
@@ -29,6 +38,14 @@ static void create_computeprimes_req(Request_msg& req, int n) {
   req.set_arg("cmd", "countprimes");
   req.set_arg("n", oss.str());
 }
+
+static struct Worker_state {
+
+  int num_arithmetic_requests;
+  int num_footprint_requests;
+  int next_tag;
+
+} wstate;
 
 // Implements logic required by compareprimes command via multiple
 // calls to execute_work.  This function fills in the appropriate
@@ -69,6 +86,10 @@ void worker_node_init(const Request_msg& params) {
 
   pthread_t poll[NUM_THREADS];
 
+  wstate.num_arithmetic_requests = 0;
+  wstate.num_footprint_requests = 0;
+  wstate.next_tag = 0;
+
   for (int i=0; i<NUM_THREADS; i++) {
     pthread_create(&poll[i], NULL, routine, new int(i));
     pthread_detach(poll[i]);
@@ -83,11 +104,48 @@ void *routine(void *arg) {
 
   // The routine of worker thread: take a request from queue and
   // process. When the process finishes, remove the request from queue.
+
+  Request_msg request = NULL:
+
   while(1) {
 
-    Request_msg request = request_queue.get_work();
+    if (pid == 0) {
 
-    worker_process_request(request);
+      request = request_queue_footprint.get_work();
+
+    }
+    else if (pid == 1) {
+
+      request = request_queue_arith.get_work();
+
+    }
+    else {
+
+      if (pid % NUM_NORMAL_QUEUE == 0) {
+
+        request = request_queue_0.get_work();
+
+      }
+      else if (pid % NUM_NORMAL_QUEUE == 1) {
+
+        request = request_queue_1.get_work();
+
+      }
+      else if (pid % NUM_NORMAL_QUEUE == 2) {
+
+        request = request_queue_2.get_work();
+
+      }
+      else if (pid % NUM_NORMAL_QUEUE == 3) {
+
+        request = request_queue_3.get_work();
+
+      }
+
+    }
+
+    if (request != NULL)
+      worker_process_request(request); 
 
   }
 
@@ -96,8 +154,41 @@ void *routine(void *arg) {
 
 void worker_handle_request(const Request_msg& req) {
 
+  string cmd = request_msg.get_arg("cmd");
+
+  if (cmd.compare("count_primes_job") == 0) {
+
+    // put arithmetic intensive request to its own queue
+    request_queue_arith.put_work(req);
+  }
+  else if (cmd.compare("cachefootprint_job") == 0) {
+
+    // put cache footprint request to its own queue
+    request_queue_footprint.put_work(req);
+  }
+  else {
+
+    // fall into normal request if not cachefootprint or 
+    // arithmetic intensive
+    if (wstate.next_tag == 0) {
+      request_queue_0.put_work(req);
+    }
+    else if (wstate.next_tag == 1) {
+      request_queue_1.put_work(req);
+    }
+    else if (wstate.next_tag == 2) {
+      request_queue_2.put_work(req);
+    }
+    else if (wstate.next_tag == 3) {
+      request_queue_3.put_work(req);
+    }
+
+    // round up to NUM_NORMAL_QUEUE
+    wstate.next_tag = (wstate.next_tag + 1) % NUM_NORMAL_QUEUE;
+  }
+
   // put all requests to a queue, wait worker threads to process
-  request_queue.put_work(req);
+  // request_queue.put_work(req);
 
 }
 
@@ -134,12 +225,8 @@ void worker_process_request(const Request_msg& req) {
 
   #ifdef DEBUG
   double dt = CycleTimer::currentSeconds() - startTime;
-  if (req.get_arg("cmd").compare("compareprimes") == 0) {
-    DLOG(INFO) << "Worker completed work (compareprimes) in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
-  }
-  else {
-    DLOG(INFO) << "Worker completed work (execute_work) in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
-  }
+
+  DLOG(INFO) << "Worker completed work in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
   #endif
 
   // send a response string to the master
