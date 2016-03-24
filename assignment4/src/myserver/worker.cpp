@@ -8,6 +8,26 @@
 #include "server/worker.h"
 #include "tools/cycle_timer.h"
 
+//#include <pthread.h>
+#include <thread>
+#include <queue>
+#include <map>
+#include <mutex>
+#include <condition_variable>
+
+using namespace std;
+
+#define MAX_THREAD 48  //define a number of queue, map workers to queues according to this number.
+#define WORK_QUEUE_NUM 12
+
+static struct Worker_state {
+  mutex mutexes[WORK_QUEUE_NUM];
+  condition_variable cv[WORK_QUEUE_NUM];
+  map<int, queue<Request_msg>> qid_req_map;
+  //pthread_t pthreads[MAX_THREAD];
+} worker_state;
+
+
 // Generate a valid 'countprimes' request dictionary from integer 'n'
 static void create_computeprimes_req(Request_msg& req, int n) {
   std::ostringstream oss;
@@ -44,6 +64,58 @@ static void execute_compareprimes(const Request_msg& req, Response_msg& resp) {
       resp.set_response("There are more primes in second range.");
 }
 
+void process_queue(int qid){
+//void *process_queue(void* arg){
+  while(1) {
+    //int qid = *(int*) arg;
+    //DLOG(INFO) << this_thread::get_id() << " Worker waiting on lock queue [" << qid << "] \n";
+    unique_lock <mutex> lck(worker_state.mutexes[qid]);
+    while (worker_state.qid_req_map[qid].empty()) {
+      //DLOG(INFO) << this_thread::get_id() << " Worker waiting on empty queue [" << qid << "] \n";
+      worker_state.cv[qid].wait(lck);
+    }
+    //queue <Request_msg> req_q = worker_state.qid_req_map[qid];
+    Request_msg req = worker_state.qid_req_map[qid].front();
+    worker_state.qid_req_map[qid].pop();
+    //DLOG(INFO) << this_thread::get_id() << " Worker pop tag [" << req.get_tag() << "] from queue ["<< qid<<"]\n";
+
+    lck.unlock();
+
+    // Make the tag of the reponse match the tag of the request.  This
+    // is a way for your master to match worker responses to requests.
+    Response_msg resp(req.get_tag());
+
+    // Output debugging help to the logs (in a single worker node
+    // configuration, this would be in the log logs/worker.INFO)
+    DLOG(INFO) << this_thread::get_id() << " Worker got request: [" << req.get_tag() << ":" << req.get_request_string() << "]\n";
+
+    double startTime = CycleTimer::currentSeconds();
+
+    if (req.get_arg("cmd").compare("compareprimes") == 0) {
+
+      // The compareprimes command needs to be special cased since it is
+      // built on four calls to execute_execute work.  All other
+      // requests from the client are one-to-one with calls to
+      // execute_work.
+
+      execute_compareprimes(req, resp);
+
+    } else {
+
+      // actually perform the work.  The response string is filled in by
+      // 'execute_work'
+      execute_work(req, resp);
+
+    }
+
+    double dt = CycleTimer::currentSeconds() - startTime;
+    DLOG(INFO)<< this_thread::get_id() << " Worker completed work in " << (1000.f * dt) << " ms (" << req.get_tag() << ")\n";
+
+    // send a response string to the master
+    worker_send_response(resp);
+  }
+}
+
 
 void worker_node_init(const Request_msg& params) {
 
@@ -54,40 +126,26 @@ void worker_node_init(const Request_msg& params) {
 
   DLOG(INFO) << "**** Initializing worker: " << params.get_arg("name") << " ****\n";
 
+  //launch Threads
+
+  for(int i = 0; i< MAX_THREAD; i++){
+    DLOG(INFO) << "spawn " << i << "th thread !!\n";
+    int idx = i % WORK_QUEUE_NUM;
+    thread t(process_queue, idx);
+    t.detach();
+    //pthread_create(&(worker_state.pthreads[i]), NULL,process_queue, new int(idx));
+    //pthread_detach(worker_state.pthreads[i]);
+    //worker_state.threads[i]=t;
+  }
+  DLOG(INFO) << "**** Initialized worker: " << params.get_arg("name") << " !!\n";
+
 }
 
 void worker_handle_request(const Request_msg& req) {
-
-  // Make the tag of the reponse match the tag of the request.  This
-  // is a way for your master to match worker responses to requests.
-  Response_msg resp(req.get_tag());
-
-  // Output debugging help to the logs (in a single worker node
-  // configuration, this would be in the log logs/worker.INFO)
-  DLOG(INFO) << "Worker got request: [" << req.get_tag() << ":" << req.get_request_string() << "]\n";
-
-  double startTime = CycleTimer::currentSeconds();
-
-  if (req.get_arg("cmd").compare("compareprimes") == 0) {
-
-    // The compareprimes command needs to be special cased since it is
-    // built on four calls to execute_execute work.  All other
-    // requests from the client are one-to-one with calls to
-    // execute_work.
-
-    execute_compareprimes(req, resp);
-
-  } else {
-
-    // actually perform the work.  The response string is filled in by
-    // 'execute_work'
-    execute_work(req, resp);
-
-  }
-
-  double dt = CycleTimer::currentSeconds() - startTime;
-  DLOG(INFO) << "Worker completed work in " << (1000.f * dt) << " ms (" << req.get_tag()  << ")\n";
-
-  // send a response string to the master
-  worker_send_response(resp);
+  //add to queue
+  int idx = req.get_tag() % WORK_QUEUE_NUM;
+  DLOG(INFO) << "add tag=" << req.get_tag() << " to queue="<<idx<<", queue size= "<<worker_state.qid_req_map[idx].size()<<" !\n";
+  lock_guard<mutex> lck(worker_state.mutexes[idx]);
+  worker_state.qid_req_map[idx].push(req);
+  worker_state.cv[idx].notify_one();
 }

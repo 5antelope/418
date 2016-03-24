@@ -1,9 +1,18 @@
 #include <glog/logging.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <map>
 
 #include "server/messages.h"
 #include "server/master.h"
+
+using namespace std;
+
+struct Client_request{
+  Request_msg request_msg;
+  Client_handle waiting_client;
+  int tag;
+};
 
 
 static struct Master_state {
@@ -15,11 +24,15 @@ static struct Master_state {
 
   bool server_ready;
   int max_num_workers;
-  int num_pending_client_requests;
+  //int num_pending_client_requests;
   int next_tag;
 
+  //defines a worker to handle the work
+  //only one worker so far
   Worker_handle my_worker;
-  Client_handle waiting_client;
+
+  //a queue to store the requests
+  map<int,Client_request> client_request_map;
 
 } mstate;
 
@@ -32,7 +45,6 @@ void master_node_init(int max_workers, int& tick_period) {
 
   mstate.next_tag = 0;
   mstate.max_num_workers = max_workers;
-  mstate.num_pending_client_requests = 0;
 
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
@@ -40,8 +52,8 @@ void master_node_init(int max_workers, int& tick_period) {
   mstate.server_ready = false;
 
   // fire off a request for a new worker
+  int tag = 0;
 
-  int tag = random();
   Request_msg req(tag);
   req.set_arg("name", "my worker 0");
   request_new_worker_node(req);
@@ -72,9 +84,13 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
 
   DLOG(INFO) << "Master received a response from a worker: [" << resp.get_tag() << ":" << resp.get_response() << "]" << std::endl;
 
-  send_client_response(mstate.waiting_client, resp);
+  send_client_response(mstate.client_request_map[resp.get_tag()].waiting_client, resp);
 
-  mstate.num_pending_client_requests = 0;
+  //remove itself from the queue
+  if(!mstate.client_request_map.empty()){
+    mstate.client_request_map.erase(resp.get_tag());
+  }
+
 }
 
 void handle_client_request(Client_handle client_handle, const Request_msg& client_req) {
@@ -91,33 +107,19 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
     return;
   }
 
-  // The provided starter code cannot handle multiple pending client
-  // requests.  The server returns an error message, and the checker
-  // will mark the response as "incorrect"
-  if (mstate.num_pending_client_requests > 0) {
-    Response_msg resp(0);
-    resp.set_response("Oh no! This server cannot handle multiple outstanding requests!");
-    send_client_response(client_handle, resp);
-    return;
-  }
-
-  // Save off the handle to the client that is expecting a response.
-  // The master needs to do this it can response to this client later
-  // when 'handle_worker_response' is called.
-  mstate.waiting_client = client_handle;
-  mstate.num_pending_client_requests++;
-
-  // Fire off the request to the worker.  Eventually the worker will
-  // respond, and your 'handle_worker_response' event handler will be
-  // called to forward the worker's response back to the server.
+  //put into map first
+  //DLOG(INFO) << "Put request into Queue! " << client_req.get_request_string() << std::endl;
   int tag = mstate.next_tag++;
   Request_msg worker_req(tag, client_req);
+
+  Client_request client_request;
+  client_request.request_msg = worker_req;
+  client_request.waiting_client = client_handle;
+  mstate.client_request_map[tag] = client_request;
+
+  //send to worker now
+  //DLOG(INFO) << "You are the only item in the Queue! process directly" << client_req.get_request_string() << std::endl;
   send_request_to_worker(mstate.my_worker, worker_req);
-
-  // We're done!  This event handler now returns, and the master
-  // process calls another one of your handlers when action is
-  // required.
-
 }
 
 
