@@ -18,7 +18,7 @@
 using namespace std;
 
 #define MAX_THREAD 48  //define a number of queue, map workers to queues according to this number.
-#define WORK_QUEUE_NUM 12
+#define WORK_QUEUE_NUM 4
 
 static struct Worker_state {
   mutex mutexes[WORK_QUEUE_NUM];
