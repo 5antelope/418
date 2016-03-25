@@ -4,11 +4,32 @@
 #include <queue>
 #include <map>
 #include <vector>
+#include <limits>
 
 #include "server/messages.h"
 #include "server/master.h"
+#include "tools/cycle_timer.h"
 
 using namespace std;
+
+static const int THRESHOLD_HIGH = 3000;
+static const int THRESHOLD_LOW = 1500;
+
+typedef struct {
+
+  // Keep meta data about workers:
+  // 0) is it avitve
+  // 1) how many pendings on the worker
+  // 2) how many footprint requests on the worker
+  // 3) how many arithmetic requests on the worker
+  // 4) latest latency from the worker
+
+  bool is_active;
+  int num_pending_requests;
+  int num_footprint_requests;
+  double latest_latency;
+
+} Worker_meta;
 
 static struct Master_state {
 
@@ -21,7 +42,6 @@ static struct Master_state {
   int max_num_workers;
   int num_pending_client_requests;
   int next_tag;
-  int free_worker;
   int num_workers;
 
   int index;
@@ -29,14 +49,21 @@ static struct Master_state {
   // worker_list keeps track of workers
   // Worker_handle my_worker;
   vector<Worker_handle> worker_list;
-  vector<int> worker_counter;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
   map<int, Client_handle> client_map;
 
-  // map worker to corresponding index
-  map<Worker_handle, int> worker_map;
+  // map worker to corresponding meta data
+  map<Worker_handle, Worker_meta> worker_map;
+
+  // map tag to request type
+  // 0: cache footprint
+  // 1: othres
+  map<int, int> request_type;
+
+  // map tag to start time;
+  map<int, double> timer_map;
 
 } mstate;
 
@@ -47,24 +74,27 @@ void master_node_init(int max_workers, int& tick_period) {
   tick_period = 1;
 
   mstate.next_tag = 0;
-  mstate.free_worker = 0;
   mstate.num_workers = 0;
   mstate.max_num_workers = max_workers;
   mstate.num_pending_client_requests = 0;
 
   mstate.index = 0;
+
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
   // when 'master_node_init' returnes
+  
   mstate.server_ready = false;
 
   // fire off a request for a new worker
   // take normal tag number
+
+  // TOOD: update how many worker to lauch at init
   for (int i=0; i<max_workers; i++) {
     int tag = mstate.next_tag++;
     Request_msg req(tag);
 
-    string name = "my worker" + to_string(tag);
+    string name = "my worker " + to_string(tag);
     req.set_arg("name", name);
 
     request_new_worker_node(req);
@@ -78,12 +108,25 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
 
-  mstate.worker_map[worker_handle] = mstate.num_workers;
+  // TODO: 
+  // Worker_meta: 
+  // 1) is_active = true
+  // 2) num_pending_requests = 0
+  // 3) num_footprint_requests = 0
+  // 4) latest_latency = 0
+  // ** add Worker_meta to worker_map 
+
+  Worker_meta meta;
+
+  meta.is_active = true;
+  meta.num_pending_requests = 0;
+  meta.num_footprint_requests = 0;
+  meta.latest_latency = 0;
+
+  mstate.worker_map[worker_handle] = meta;
 
   mstate.worker_list.push_back(worker_handle);
-  mstate.worker_counter.push_back(0);
 
-  mstate.free_worker++;
   mstate.num_workers++;
   DLOG(INFO) << "worker: " << mstate.num_workers << " on line" << std::endl;
 
@@ -101,27 +144,38 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
   // Master node has received a response from one of its workers.
   // Here we directly return this response to the client.
 
+  // TODO:
+  // 1) get meta data from worker_map, 
+  // 2) update num_pending_requests, num_footprint_requests and latest_latency
+  // 3) send out response
+
+  double endTime = CycleTimer::currentSeconds();
+
   DLOG(INFO) << "Master received a response from a worker: [" << resp.get_tag() << ":" << resp.get_response() << "]" << std::endl;
 
   int tag = resp.get_tag();
-  map<int, Worker_handle>::iterator itr = mstate.client_map.find(tag);
-  if (itr != mstate.client_map.end()) {
-    // find which client needs response
-    Client_handle client = itr->second;
-    send_client_response(client, resp);
 
-    // clear number of pening client request and
-    // add a free worker to queue to use
-    mstate.num_pending_client_requests--;
+  Client_handle client = mstate.client_map[tag];
 
-    // decrease the worker_count for worker_handle
-    map<Worker_handle, int>::iterator worker_idx_itr = mstate.worker_map.find(worker_handle);
-    if (worker_idx_itr != mstate.worker_map.end()) {
-      int pos = worker_idx_itr->second;
-      mstate.worker_counter.at(pos)--;
-    }
+  send_client_response(client, resp);
 
+  double dt = endTime - mstate.timer_map[tag];
+  mstate.timer_map.erase(tag);
+
+  // clear number of pening client request and
+  // add a free worker to queue to use
+  mstate.num_pending_client_requests--;
+
+  // decrease the worker_count in meta data
+  Worker_meta meta = mstate.worker_map[worker_handle];
+  if (mstate.request_type[tag] == 0) {
+    // cache footprint
+    meta.num_footprint_requests--;
   }
+  else {
+    meta.num_pending_requests--;
+  }
+  meta.latest_latency = dt;
 
 }
 
@@ -132,6 +186,12 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // You can assume that traces end with this special message.  It
   // exists because it might be useful for debugging to dump
   // information about the entire run here: statistics, etc.
+
+  // TODO:
+  // save request type in request_type map
+  // check request type, and send it to the worker with smallest corresponding counts
+  // update worker's num_pending_requests/num_footprint_requests
+  // send request to worker
 
   if (client_req.get_arg("cmd") == "lastrequest") {
     Response_msg resp(0);
@@ -159,17 +219,21 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   int tag = mstate.next_tag++;
   mstate.client_map.insert ( std::pair<int, Client_handle>(tag, client_handle) );
 
+  string cmd = request_msg.get_arg("cmd");
+
+  // remember type of request by tags
+  if (cmd.compare("cachefootprint_job") == 0)
+    request_type[tag] = 0;
+  else 
+    request_type[tag] = 1; 
+
   // create request for worker
   Request_msg worker_req(tag, client_req);
 
-  // round-robin
-  // Worker_handle worker = mstate.worker_list.at(rand()  % mstate.num_workers);
-  Worker_handle worker = mstate.worker_list.at(mstate.index % mstate.num_workers);
-  mstate.worker_counter.at(mstate.index % mstate.num_workers)++;
-  mstate.index++;
+  // select a woker for request
+  Worker_handle worker = pick_idle_woker(cmd);
 
-  DLOG(INFO) << "Index = " << mstate.index << std::endl;
-
+  mstate.timer_map[tag] = CycleTimer::currentSeconds();
   send_request_to_worker(worker, worker_req);
 
   // We're done!  This event handler now returns, and the master
@@ -178,32 +242,86 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
 
 }
 
+Worker_handle pick_idle_woker(string cmd) {
+  Worker_handle worker = NULL;
+  int min = numeric_limits<int>::max();
+
+  for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
+
+    Worker_handle tmp = *it;
+
+    if (cmd.compare("cachefootprint_job") == 0 && mstate.worker_map[tmp].num_footprint_requests < min)
+      worker = tmp;
+    else if (mstate.worker_map[tmp].num_pending_requests < min)
+      worker = tmp;
+  
+  }
+
+  return worker;
+}
+
+double get_avg_latency() {
+
+  double avg_latency = 0;
+
+  for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
+
+    // sum up all latest_latency
+     avg_latency += mstate.worker_map[*it].latest_latency;
+  }
+
+  return avg_latency / mstate.num_workers;
+
+}
+
+void check_and_kill() {
+
+  // check all worker_list and their meta data, send kill request to 
+  // woker which is in-active and pending job number = 0
+  for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
+
+     if (!mstate.worker_map[*it].is_active 
+      && mstate.worker_map[*it].num_pending_requests == 0 && num_footprint_requests == 0 ) {
+
+      kill_worker_node(*it);
+    }
+
+  }
+ 
+}
+
 void handle_tick() {
 
   // TODO: you may wish to take action here.  This method is called at
   // fixed time intervals, according to how you set 'tick_period' in
   // 'master_node_init'.
 
-  // try to remove workers if there is totally free one
-  if (mstate.num_workers < mstate.max_num_workers) {
-    for (int i=0; i<mstate.num_workers; i++) {
-      if (mstate.worker_counter.at(i)==0) {
-        // kill the worker
-        Worker_handle worker = mstate.worker_list.at(i);
-        kill_worker_node(worker);
+  // check average latency
+  double avg_latency = get_avg_latency();
 
-        // remove meta data from vectors
-        mstate.worker_counter.erase(mstate.worker_counter.begin() + i);
-        mstate.worker_list.erase(mstate.worker_list.begin() + i);
-
-        mstate.worker_map.erase(worker);
-        // only kill one node every time
-
-        DLOG(INFO) << "Kill a worker" << std::endl;
-        break;
-      }
-    }
+  if (avg_latency < THRESHOLD_LOW) {
+    // remove worker
+    // pick a random active workers
+    int pos = rand() & mstate.num_workers;
+    Worker_handle worker = mstate.worker_list.at(pos);
+    
+    // invalid the worker
+    mstate.worker_map[woker].is_active = false;
+    
   }
+  else if (avg_latency > THRESHOLD_HIGH) {
+    // add new worker
+    int tag = mstate.next_tag++;
+    Request_msg req(tag);
+
+    string name = "my worker " + to_string(tag);
+    req.set_arg("name", name);
+
+    request_new_worker_node(req);
+
+  }
+
+  check_and_kill();
 
 }
 

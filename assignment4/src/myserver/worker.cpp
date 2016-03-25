@@ -25,8 +25,6 @@ static WorkQueue<Request_msg> request_queue_3;
 
 // queue for cachefootprint request
 static WorkQueue<Request_msg> request_queue_footprint;
-// queue for arithmetic intensive requests
-static WorkQueue<Request_msg> request_queue_arith;
 
 void *routine(void*);
 void worker_process_request(const Request_msg& req);
@@ -112,11 +110,7 @@ void *routine(void *arg) {
     if (pid == 0) {
 
       request = request_queue_footprint.get_work();
-
-    }
-    else if (pid == 1) {
-
-      request = request_queue_arith.get_work();
+      worker_process_request(request); 
 
     }
     else {
@@ -124,28 +118,29 @@ void *routine(void *arg) {
       if (pid % NUM_NORMAL_QUEUE == 0) {
 
         request = request_queue_0.get_work();
+        worker_process_request(request); 
 
       }
       else if (pid % NUM_NORMAL_QUEUE == 1) {
 
         request = request_queue_1.get_work();
+        worker_process_request(request); 
 
       }
       else if (pid % NUM_NORMAL_QUEUE == 2) {
 
         request = request_queue_2.get_work();
+        worker_process_request(request); 
 
       }
       else if (pid % NUM_NORMAL_QUEUE == 3) {
 
         request = request_queue_3.get_work();
+        worker_process_request(request); 
 
       }
 
     }
-
-    if (request != NULL)
-      worker_process_request(request); 
 
   }
 
@@ -156,15 +151,11 @@ void worker_handle_request(const Request_msg& req) {
 
   string cmd = request_msg.get_arg("cmd");
 
-  if (cmd.compare("count_primes_job") == 0) {
-
-    // put arithmetic intensive request to its own queue
-    request_queue_arith.put_work(req);
-  }
-  else if (cmd.compare("cachefootprint_job") == 0) {
+  if (cmd.compare("cachefootprint_job") == 0) {
 
     // put cache footprint request to its own queue
     request_queue_footprint.put_work(req);
+    
   }
   else {
 
