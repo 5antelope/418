@@ -103,7 +103,7 @@ void *routine(void *arg) {
   // The routine of worker thread: take a request from queue and
   // process. When the process finishes, remove the request from queue.
 
-  Request_msg request = NULL:
+  Request_msg request = NULL;
 
   while(1) {
 
@@ -111,6 +111,12 @@ void *routine(void *arg) {
 
       request = request_queue_footprint.get_work();
       worker_process_request(request); 
+
+    }
+    else if (pid == 1) {
+
+      request = request_queue_arith.get_work();
+      worker_process_request(request);
 
     }
     else {
@@ -136,7 +142,7 @@ void *routine(void *arg) {
       else if (pid % NUM_NORMAL_QUEUE == 3) {
 
         request = request_queue_3.get_work();
-        worker_process_request(request); 
+        worker_process_request(request);
 
       }
 
@@ -149,7 +155,7 @@ void *routine(void *arg) {
 
 void worker_handle_request(const Request_msg& req) {
 
-  string cmd = request_msg.get_arg("cmd");
+  string cmd = req.get_arg("cmd");
 
   if (cmd.compare("cachefootprint_job") == 0) {
 
@@ -159,7 +165,7 @@ void worker_handle_request(const Request_msg& req) {
   }
   else {
 
-    // fall into normal request if not cachefootprint or 
+    // fall into normal request if not cachefootprint or
     // arithmetic intensive
     if (wstate.next_tag == 0) {
       request_queue_0.put_work(req);
