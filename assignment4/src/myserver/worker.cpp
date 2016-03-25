@@ -110,12 +110,6 @@ void *routine(void *arg) {
     if (pid == 0) {
 
       request = request_queue_footprint.get_work();
-      worker_process_request(request); 
-
-    }
-    else if (pid == 1) {
-
-      request = request_queue_arith.get_work();
       worker_process_request(request);
 
     }
@@ -124,19 +118,19 @@ void *routine(void *arg) {
       if (pid % NUM_NORMAL_QUEUE == 0) {
 
         request = request_queue_0.get_work();
-        worker_process_request(request); 
+        worker_process_request(request);
 
       }
       else if (pid % NUM_NORMAL_QUEUE == 1) {
 
         request = request_queue_1.get_work();
-        worker_process_request(request); 
+        worker_process_request(request);
 
       }
       else if (pid % NUM_NORMAL_QUEUE == 2) {
 
         request = request_queue_2.get_work();
-        worker_process_request(request); 
+        worker_process_request(request);
 
       }
       else if (pid % NUM_NORMAL_QUEUE == 3) {

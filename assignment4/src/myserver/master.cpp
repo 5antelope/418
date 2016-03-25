@@ -15,6 +15,8 @@ using namespace std;
 static const int THRESHOLD_HIGH = 3000;
 static const int THRESHOLD_LOW = 1500;
 
+Worker_handle pick_idle_woker(string cmd);
+
 typedef struct {
 
   // Keep meta data about workers:
@@ -219,13 +221,13 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   int tag = mstate.next_tag++;
   mstate.client_map.insert ( std::pair<int, Client_handle>(tag, client_handle) );
 
-  string cmd = request_msg.get_arg("cmd");
+  string cmd = client_req.get_arg("cmd");
 
   // remember type of request by tags
   if (cmd.compare("cachefootprint_job") == 0)
-    request_type[tag] = 0;
-  else 
-    request_type[tag] = 1; 
+    mstate.request_type[tag] = 0;
+  else
+    mstate.request_type[tag] = 1;
 
   // create request for worker
   Request_msg worker_req(tag, client_req);
@@ -276,18 +278,18 @@ double get_avg_latency() {
 
 void check_and_kill() {
 
-  // check all worker_list and their meta data, send kill request to 
+  // check all worker_list and their meta data, send kill request to
   // woker which is in-active and pending job number = 0
   for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
 
-     if (!mstate.worker_map[*it].is_active 
-      && mstate.worker_map[*it].num_pending_requests == 0 && num_footprint_requests == 0 ) {
+     if (!mstate.worker_map[*it].is_active
+      && mstate.worker_map[*it].num_pending_requests == 0 && mstate.worker_map[*it].num_footprint_requests == 0 ) {
 
       kill_worker_node(*it);
     }
 
   }
- 
+
 }
 
 void handle_tick() {
@@ -304,10 +306,10 @@ void handle_tick() {
     // pick a random active workers
     int pos = rand() & mstate.num_workers;
     Worker_handle worker = mstate.worker_list.at(pos);
-    
+
     // invalid the worker
-    mstate.worker_map[woker].is_active = false;
-    
+    mstate.worker_map[worker].is_active = false;
+
   }
   else if (avg_latency > THRESHOLD_HIGH) {
     // add new worker
