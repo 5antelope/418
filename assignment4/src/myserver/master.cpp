@@ -10,6 +10,7 @@
 #define BOOTING 1
 #define RUNNING 2
 #define CLOSING 3
+#define BOOTING_CLOSING 4
 
 #define SCALE_OUT_THRESHOLD 36  // request per node > 36, scale out
 #define SCALE_IN_THRESHOLD 32   // if scale in by one,   request per node <=32, then scale in
@@ -27,6 +28,10 @@ struct Client_request{
   Request_msg request_msg;
   Client_handle waiting_client;
   int worker_index;
+  bool is_part_of_compare_primes;
+  bool is_completed;
+  int order; //0,1,2,3
+
 };
 
 struct Worker_info{
@@ -122,7 +127,7 @@ class Worker_metrics{
       for(int i = 0; i< number; i++){
         int booting_tag = getFirstWorker(BOOTING);
         if(booting_tag!=-1){
-          worker_info_map[booting_tag].status = CLOSING;
+          worker_info_map[booting_tag].status = BOOTING_CLOSING;
           continue;
         }
 
@@ -144,7 +149,11 @@ class Worker_metrics{
     }
     void markWorkOnline(Worker_handle worker_handle, int tag){
       worker_info_map[tag].worker_handle = worker_handle;
-      worker_info_map[tag].status = RUNNING;
+      if(worker_info_map[tag].status== BOOTING_CLOSING){
+        worker_info_map[tag].status = CLOSING;
+      }else {
+        worker_info_map[tag].status = RUNNING;
+      }
     }
     void updateWorkerJobs(int job_type, int index, int amount){
       if(job_type==COMPUTE){
@@ -220,6 +229,9 @@ static struct Master_state {
   //a queue to store the requests
   map<int,Client_request> client_request_map;
 
+  //a queue to handle compare primes
+  map<int,int> count_prime_cache;
+
 } mstate;
 
 
@@ -269,9 +281,6 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
 
   DLOG(INFO) << "Master received a response from a worker: [" << resp.get_tag() << ":" << resp.get_response() << "]" << std::endl;
 
-  send_client_response(mstate.client_request_map[resp.get_tag()].waiting_client, resp);
-
-
   string cmd = mstate.client_request_map[resp.get_tag()].request_msg.get_arg("cmd");
   int worker_index = mstate.client_request_map[resp.get_tag()].worker_index;
 
@@ -279,10 +288,66 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
   mstate.worker_metrics.handleWorkResp(cmd, worker_index);
 
 
-  //remove itself from the queue
-  if(!mstate.client_request_map.empty()){
-    mstate.client_request_map.erase(resp.get_tag());
+  if(!mstate.client_request_map[resp.get_tag()].is_part_of_compare_primes) {
+    send_client_response(mstate.client_request_map[resp.get_tag()].waiting_client, resp);
+
+    //remove itself from the queue
+    if(!mstate.client_request_map.empty()){
+      mstate.client_request_map.erase(resp.get_tag());
+    }
+  }else{
+    //part of compare prime
+    //check if all parts arrives, if so compute and reply to client
+    mstate.client_request_map[resp.get_tag()].is_completed = true;
+    //put into cache first.
+    int prime = atoi(mstate.client_request_map[resp.get_tag()].request_msg.get_arg("n").c_str());
+    int count = atoi(resp.get_response().c_str());
+    //DLOG(INFO) << " put into cache, number "<<prime<<", has "<<count<<" primes"<< endl;
+
+    mstate.count_prime_cache[prime] = count;
+    int start_tag = resp.get_tag() - mstate.client_request_map[resp.get_tag()].order;
+    bool result = true;
+    int counts[4];
+    for(int i = 0; i<4; i++){
+      if(mstate.client_request_map.find(start_tag+i)== mstate.client_request_map.end()){
+        result = false;
+        break;
+      }
+      if(!mstate.client_request_map[start_tag+i].is_completed) {
+        result = false;
+        break;
+      }
+      int prime = atoi(mstate.client_request_map[start_tag+i].request_msg.get_arg("n").c_str());
+      counts[i] = mstate.count_prime_cache[prime];
+    }
+    if(result){
+      Response_msg dummy_resp(0);
+      //DLOG(INFO) << " count0="<<counts[0]<< " count1="<<counts[1]<< " count2="<<counts[2]<< " count3="<<counts[3]<<endl;
+      if (counts[1]-counts[0] > counts[3]-counts[2])
+        dummy_resp.set_response("There are more primes in first range.");
+      else
+        dummy_resp.set_response("There are more primes in second range.");
+
+      send_client_response(mstate.client_request_map[resp.get_tag()].waiting_client, dummy_resp);
+      //remove all requests
+      for(int i = 0; i<4; i++){
+        if(!mstate.client_request_map.empty()){
+          mstate.client_request_map.erase(start_tag+i);
+        }
+      }
+    }
+
   }
+
+
+}
+
+static void create_computeprimes_req(Request_msg& req, int n) {
+  std::ostringstream oss;
+  oss << n;
+  req.set_arg("cmd", "countprimes");
+  req.set_arg("dummy", "true");
+  req.set_arg("n", oss.str());
 }
 
 void handle_client_request(Client_handle client_handle, const Request_msg& client_req) {
@@ -299,6 +364,36 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
     return;
   }
 
+
+  if(client_req.get_arg("cmd") == "compareprimes"){
+    int params[4];
+
+    // grab the four arguments defining the two ranges
+    params[0] = atoi(client_req.get_arg("n1").c_str());
+    params[1] = atoi(client_req.get_arg("n2").c_str());
+    params[2] = atoi(client_req.get_arg("n3").c_str());
+    params[3] = atoi(client_req.get_arg("n4").c_str());
+
+    for(int i = 0; i< 4; i++){
+      int tag = mstate.next_tag++;
+      Request_msg dummy_req(tag);
+      create_computeprimes_req(dummy_req, params[i]);
+
+      Client_request client_request;
+      client_request.request_msg = dummy_req;
+      client_request.waiting_client = client_handle;
+      client_request.is_part_of_compare_primes = true;
+      client_request.is_completed= false;
+      client_request.order=i;
+
+      client_request.worker_index = mstate.worker_metrics.sendWork(dummy_req);
+      mstate.client_request_map[tag] = client_request;
+    }
+
+    return;
+
+  }
+
   //put into map first
   //DLOG(INFO) << "Put request into Queue! " << client_req.get_request_string() << std::endl;
   int tag = mstate.next_tag++;
@@ -307,8 +402,7 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   Client_request client_request;
   client_request.request_msg = worker_req;
   client_request.waiting_client = client_handle;
-
-
+  client_request.is_part_of_compare_primes = false;
 
   //send to worker now
   //now send based on MOD value. Actually, in the future, this could be done through

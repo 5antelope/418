@@ -95,22 +95,24 @@ void process_queue(int qid){
 
     double startTime = CycleTimer::currentSeconds();
 
-    if (req.get_arg("cmd").compare("compareprimes") == 0) {
+//    if (req.get_arg("cmd").compare("compareprimes") == 0) {
+//
+//      // The compareprimes command needs to be special cased since it is
+//      // built on four calls to execute_execute work.  All other
+//      // requests from the client are one-to-one with calls to
+//      // execute_work.
+//
+//      execute_compareprimes(req, resp);
+//
+//    } else {
+//
+//      // actually perform the work.  The response string is filled in by
+//      // 'execute_work'
+//      execute_work(req, resp);
+//
+//    }
 
-      // The compareprimes command needs to be special cased since it is
-      // built on four calls to execute_execute work.  All other
-      // requests from the client are one-to-one with calls to
-      // execute_work.
-
-      execute_compareprimes(req, resp);
-
-    } else {
-
-      // actually perform the work.  The response string is filled in by
-      // 'execute_work'
-      execute_work(req, resp);
-
-    }
+    execute_work(req, resp);
 
     double dt = CycleTimer::currentSeconds() - startTime;
     DLOG(INFO)<< this_thread::get_id() << " Worker completed work in " << (1000.f * dt) << " ms (" << req.get_tag() << ")\n";
