@@ -336,10 +336,7 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
         }
       }
     }
-
   }
-
-
 }
 
 static void create_computeprimes_req(Request_msg& req, int n) {
@@ -386,7 +383,13 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
       client_request.is_completed= false;
       client_request.order=i;
 
-      client_request.worker_index = mstate.worker_metrics.sendWork(dummy_req);
+      if(mstate.count_prime_cache.find(params[i]) == mstate.count_prime_cache.end()) {
+        //not found
+        client_request.worker_index = mstate.worker_metrics.sendWork(dummy_req);
+      }else{
+        //found
+        client_request.is_completed= true;
+      }
       mstate.client_request_map[tag] = client_request;
     }
 
