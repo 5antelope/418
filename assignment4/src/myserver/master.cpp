@@ -77,12 +77,15 @@ class Worker_metrics{
         int result =  ((total_request+SCALE_IN_THRESHOLD-1) / SCALE_IN_THRESHOLD) - (running+booting);
         if(result+running+booting>max_num_workers)
           result=max_num_workers-running-booting;
+
+        DLOG(INFO) << "Scale OUT ["<<result<<]": running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
         return result;
 
       } else {
         if((running+booting-1)==0)
           return 0;
         else if(total_request/(running+booting-1)>=SCALE_IN_THRESHOLD) {
+          DLOG(INFO) << "Scale IN [1]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
           return -1;
         }
         return 0;
@@ -116,6 +119,12 @@ class Worker_metrics{
     void scaleIn(int number) {
       //scale in number of instances, mark as closing
       for(int i = 0; i< number; i++){
+        int booting_tag = getFirstWorker(BOOTING);
+        if(booting_tag!=-1){
+          worker_info_map[booting_tag].status = CLOSING;
+          continue;
+        }
+
         int tag = getFirstWorker(RUNNING);
         worker_info_map[tag].status = CLOSING;
       }
