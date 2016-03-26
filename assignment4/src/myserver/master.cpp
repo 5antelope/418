@@ -232,7 +232,56 @@ static struct Master_state {
   //a queue to handle compare primes
   map<int,int> count_prime_cache;
 
+  //caches
+  map<string, string> tellmenow_cache;
+  map<string, string> wisdom_cache;
+  map<string, string> projectidea_cache;
+
+
 } mstate;
+
+static void put_in_cache(Response_msg resp){
+  string value = resp.get_response();
+  Request_msg req = mstate.client_request_map[resp.get_tag()].request_msg;
+  string cmd = req.get_arg("cmd");
+  if(cmd=="tellmenow"){
+    mstate.tellmenow_cache[req.get_arg("x")]=value;
+  }else if (cmd=="projectidea"){
+    mstate.projectidea_cache[req.get_arg("x")]=value;
+  }else if(cmd=="418wisdom"){
+    mstate.wisdom_cache[req.get_arg("x")]=value;
+  } else if (cmd =="countprimes"){
+    mstate.count_prime_cache[atoi(req.get_arg("n").c_str())]=atoi(value.c_str());
+  }
+}
+
+static bool check_cache(Request_msg req, string &result){
+  string cmd = req.get_arg("cmd");
+  if(cmd=="tellmenow"){
+    if(mstate.tellmenow_cache.find(req.get_arg("x"))!=mstate.tellmenow_cache.end()){
+      result = mstate.tellmenow_cache[req.get_arg("x")];
+      return true;
+    }
+  }else if (cmd=="projectidea"){
+    if(mstate.projectidea_cache.find(req.get_arg("x"))!=mstate.projectidea_cache.end()){
+      result = mstate.projectidea_cache[req.get_arg("x")];
+      return true;
+    }
+  }else if(cmd=="418wisdom"){
+    if(mstate.wisdom_cache.find(req.get_arg("x"))!=mstate.wisdom_cache.end()){
+      result = mstate.wisdom_cache[req.get_arg("x")];
+      return true;
+    }
+  } else if (cmd =="countprimes"){
+    if(mstate.count_prime_cache.find(atoi(req.get_arg("n").c_str()))!=mstate.count_prime_cache.end()){
+      result = mstate.count_prime_cache[atoi(req.get_arg("n").c_str())];
+      return true;
+    }
+  }
+
+  return false;
+
+}
 
 
 void master_node_init(int max_workers, int& tick_period) {
@@ -289,6 +338,9 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
 
 
   if(!mstate.client_request_map[resp.get_tag()].is_part_of_compare_primes) {
+
+    put_in_cache(resp);
+
     send_client_response(mstate.client_request_map[resp.get_tag()].waiting_client, resp);
 
     //remove itself from the queue
@@ -396,6 +448,18 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
     return;
 
   }
+
+
+  //cache layer
+  string result ="";
+  if(check_cache(client_req, result)){
+    DLOG(INFO) << "Cache Hit!! "<< std::endl;
+    Response_msg dummy_resp(0);
+    dummy_resp.set_response(result);
+    send_client_response(client_handle, dummy_resp);
+    return;
+  }
+
 
   //put into map first
   //DLOG(INFO) << "Put request into Queue! " << client_req.get_request_string() << std::endl;
