@@ -1,4 +1,5 @@
 #include <glog/logging.h>
+#include <boost/unordered_set.hpp>
 #include <stdio.h>
 #include <stdlib.h>
 #include <queue>
@@ -48,7 +49,7 @@ static struct Master_state {
   int num_workers;
 
   // worker_list keeps track of workers
-  vector<Worker_handle> worker_list;
+  boost::unordered_set<Worker_handle> worker_list;
 
   // client_map maps request to clients by next_tag int
   // Client_handle waiting_client;
@@ -78,7 +79,7 @@ void master_node_init(int max_workers, int& tick_period) {
   // don't mark the server as ready until the server is ready to go.
   // This is actually when the first worker is up and running, not
   // when 'master_node_init' returnes
-  
+
   mstate.server_ready = false;
 
   // fire off a request for a new worker
@@ -103,13 +104,13 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   // corresponds to.  Since the starter code only sends off one new
   // worker request, we don't use it here.
 
-  // TODO: 
-  // Worker_meta: 
+  // TODO:
+  // Worker_meta:
   // 1) is_active = true
   // 2) num_pending_requests = 0
   // 3) num_footprint_requests = 0
   // 4) latest_latency = 0
-  // ** add Worker_meta to worker_map 
+  // ** add Worker_meta to worker_map
 
   Worker_meta meta;
 
@@ -118,8 +119,6 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
   meta.num_footprint_requests = 0;
 
   mstate.worker_map[worker_handle] = meta;
-
-  mstate.worker_list.push_back(worker_handle);
 
   mstate.num_workers++;
   DLOG(INFO) << "worker: " << mstate.num_workers << " on line" << std::endl;
@@ -131,6 +130,9 @@ void handle_new_worker_online(Worker_handle worker_handle, int tag) {
     server_init_complete();
     mstate.server_ready = true;
   }
+
+  mstate.worker_list.insert(worker_handle);
+  DLOG(INFO) << "Insert worker: " << worker_handle << std::endl;
 }
 
 void handle_worker_response(Worker_handle worker_handle, const Response_msg& resp) {
@@ -236,15 +238,13 @@ Worker_handle pick_idle_woker(string cmd) {
   Worker_handle worker = NULL;
   int min = numeric_limits<int>::max();
 
-  for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
-
-    Worker_handle tmp = *it;
+  for (const Worker_handle& tmp: mstate.worker_list) {
 
     if (cmd.compare("cachefootprint_job") == 0 && mstate.worker_map[tmp].num_footprint_requests < min)
       worker = tmp;
     else if (mstate.worker_map[tmp].num_pending_requests < min)
       worker = tmp;
-  
+
   }
 
   return worker;
@@ -252,9 +252,7 @@ Worker_handle pick_idle_woker(string cmd) {
 
 void elastic_check() {
 
-  for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
-
-    Worker_handle worker = *it;
+  for (const Worker_handle& worker: mstate.worker_list) {
 
     int total_requests = mstate.worker_map[worker].num_pending_requests + mstate.worker_map[worker].num_footprint_requests;
 
@@ -278,7 +276,7 @@ void elastic_check() {
 
       break;
     }
-  
+
   }
 
 }
@@ -287,12 +285,24 @@ void check_and_kill() {
 
   // check all worker_list and their meta data, send kill request to
   // woker which is in-active and pending job number = 0
-  for (vector<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
+  for (boost::unordered_set<Worker_handle>::iterator it = mstate.worker_list.begin(); it != mstate.worker_list.end(); ++it) {
+    Worker_handle worker = *it;
+    DLOG(INFO) << "CHECK " << worker << "; ";
 
-     if (!mstate.worker_map[*it].is_active
-      && mstate.worker_map[*it].num_pending_requests == 0 && mstate.worker_map[*it].num_footprint_requests == 0 ) {
+    if (!mstate.worker_map[worker].is_active
+     && mstate.worker_map[worker].num_pending_requests == 0
+     && mstate.worker_map[worker].num_footprint_requests == 0)
+    {
+      DLOG(INFO) << "Decide to kill a worker: "<< worker <<" Current woker size: " << mstate.worker_list.size() << std::endl;
 
-      kill_worker_node(*it);
+      mstate.worker_list.erase(worker);
+
+      DLOG(INFO) << typeid(worker).name() << "; "<< worker;
+      kill_worker_node(worker);
+
+      DLOG(INFO) << "Killed a worker. Current woker size: " << mstate.worker_list.size() << std::endl;
+
+      break;
     }
 
   }
