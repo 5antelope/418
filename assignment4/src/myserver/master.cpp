@@ -12,8 +12,8 @@
 #define CLOSING 3
 #define BOOTING_CLOSING 4
 
-#define SCALE_OUT_THRESHOLD 36  // request per node > 36, scale out
-#define SCALE_IN_THRESHOLD 32   // if scale in by one,   request per node <=32, then scale in
+#define SCALE_OUT_THRESHOLD 42  // request per node > 36, scale out
+#define SCALE_IN_THRESHOLD 36   // if scale in by one,   request per node <=32, then scale in
 
 //job type
 #define COMPUTE 0
@@ -142,7 +142,10 @@ class Worker_metrics{
               && worker_info_map[i].tellmenow_jobs==0
               && worker_info_map[i].projectidea_jobs==0){
             //actual show down
+            DLOG(INFO) << "Killing worker "<<i<<" !" << std::endl;
             kill_worker_node(worker_info_map[i].worker_handle);
+            worker_info_map[i].status=INACTIVE;
+            DLOG(INFO) << "Killed worker "<<i<<" !" << std::endl;
           }
         }
       }
@@ -354,7 +357,7 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
     //put into cache first.
     int prime = atoi(mstate.client_request_map[resp.get_tag()].request_msg.get_arg("n").c_str());
     int count = atoi(resp.get_response().c_str());
-    //DLOG(INFO) << " put into cache, number "<<prime<<", has "<<count<<" primes"<< endl;
+    DLOG(INFO) << " put into cache, number "<<prime<<", has "<<count<<" primes"<< endl;
 
     mstate.count_prime_cache[prime] = count;
     int start_tag = resp.get_tag() - mstate.client_request_map[resp.get_tag()].order;
