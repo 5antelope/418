@@ -15,6 +15,8 @@
 #define SCALE_OUT_THRESHOLD 38  // request per node > 36, scale out
 #define SCALE_IN_THRESHOLD 37   // if scale in by one,   request per node <=32, then scale in
 
+#define PROJECTIDEA_THRESHOLD
+
 //job type
 #define COMPUTE 0
 #define PROJECTIDEA 1
@@ -58,24 +60,36 @@ class Worker_metrics{
     int getScaleNumber(){
       //count requests number per worker (booting + running)
       int total_request = 0; //exclude tellmenow jobs
+      int total_projectidea=0;
       int running = 0;
       int booting = 0;
       int closing = 0;
       for(int i = 0; i< max_num_workers; i++){
         if(worker_info_map[i].status == RUNNING){
           running++;
-          total_request+=(worker_info_map[i].compute_jobs+worker_info_map[i].projectidea_jobs);
+          total_request+=(worker_info_map[i].compute_jobs+worker_info_map[i].projectidea_jobs+worker_info_map[i].tellmenow_jobs);
+          total_projectidea+=worker_info_map[i].projectidea_jobs;
         }else if(worker_info_map[i].status == BOOTING) {
           booting++;
-          total_request+=(worker_info_map[i].compute_jobs+worker_info_map[i].projectidea_jobs);
+          //total_request+=(worker_info_map[i].compute_jobs+worker_info_map[i].projectidea_jobs+worker_info_map[i].tellmenow_jobs);
         }
         else if(worker_info_map[i].status == CLOSING){
           closing++;
         }
       }
 
-      //DLOG(INFO) << "Get Scale Number: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
+      //scale for projectidea
+      if(total_projectidea>=running+booting){
+        int result =  total_projectidea-(running+booting);
+        if(result+running+booting>max_num_workers){
+          result = max_num_workers-running+booting;
+        }
+        DLOG(INFO) << "Scale OUT on projectidea ["<<result<<"]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request <<", total projectidea="<<total_projectidea<< std::endl;
+        return result;
+      }
 
+      //DLOG(INFO) << "Get Scale Number: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
+      //normal scale
       if((running+booting)==0){
         return 0;
       }
@@ -489,10 +503,10 @@ void handle_tick() {
     int scale_number = mstate.worker_metrics.getScaleNumber();
     //DLOG(INFO) << "Scale Number "<< scale_number << std::endl;
     if (scale_number > 0) {
-      DLOG(INFO) << "Scale OUT EVENT! Number "<< scale_number << std::endl;
+      //DLOG(INFO) << "Scale OUT EVENT! Number "<< scale_number << std::endl;
       mstate.worker_metrics.scaleOut(scale_number);
     } else if (scale_number < 0) {
-      DLOG(INFO) << "Scale IN EVENT! Number "<< -1*scale_number << std::endl;
+      //DLOG(INFO) << "Scale IN EVENT! Number "<< -1*scale_number << std::endl;
       mstate.worker_metrics.scaleIn(-1 * scale_number);
     }
     mstate.worker_metrics.actualShutDown();
