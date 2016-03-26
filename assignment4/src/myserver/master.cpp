@@ -256,6 +256,8 @@ void elastic_check() {
 
     int total_requests = mstate.worker_map[worker].num_pending_requests + mstate.worker_map[worker].num_footprint_requests;
 
+    DLOG(INFO) << "Total request: " << total_requests << std::endl;
+
     if (mstate.num_workers < mstate.max_num_workers && total_requests > THRESHOLD_HIGH) {
       // add a worker
       int tag = mstate.next_tag++;
@@ -265,6 +267,8 @@ void elastic_check() {
       req.set_arg("name", name);
 
       request_new_worker_node(req);
+
+      DLOG(INFO) << "Reqeusted a new worker" << std::endl;
 
       break;
     }
