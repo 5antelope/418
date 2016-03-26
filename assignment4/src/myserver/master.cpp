@@ -12,8 +12,8 @@
 #define CLOSING 3
 #define BOOTING_CLOSING 4
 
-#define SCALE_OUT_THRESHOLD 40  // request per node > 36, scale out
-#define SCALE_IN_THRESHOLD 36   // if scale in by one,   request per node <=32, then scale in
+#define SCALE_OUT_THRESHOLD 38  // request per node > 36, scale out
+#define SCALE_IN_THRESHOLD 37   // if scale in by one,   request per node <=32, then scale in
 
 //job type
 #define COMPUTE 0
