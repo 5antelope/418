@@ -26,6 +26,7 @@ using namespace std;
 struct Client_request{
   Request_msg request_msg;
   Client_handle waiting_client;
+  int worker_index;
 };
 
 struct Worker_info{
@@ -78,13 +79,13 @@ class Worker_metrics{
         if(result+running+booting>max_num_workers)
           result=max_num_workers-running-booting;
 
-        DLOG(INFO) << "Scale OUT ["<<result<<]": running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
+        DLOG(INFO) << "Scale OUT ["<<result<<"]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
         return result;
 
       } else {
         if((running+booting-1)==0)
           return 0;
-        else if(total_request/(running+booting-1)>=SCALE_IN_THRESHOLD) {
+        else if(total_request/(running+booting-1)<=SCALE_IN_THRESHOLD) {
           DLOG(INFO) << "Scale IN [1]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
           return -1;
         }
@@ -154,7 +155,7 @@ class Worker_metrics{
         worker_info_map[index].tellmenow_jobs+=amount;
       }
     }
-    void sendWork(const Request_msg& req){
+    int sendWork(const Request_msg& req){
       int min_index=-1;
       int min_count=800;
       int job_type =COMPUTE;
@@ -185,16 +186,18 @@ class Worker_metrics{
       }
 
       updateWorkerJobs(job_type,min_index, 1);
+
       DLOG(INFO) << "LB: sending work type["<<job_type<<"] to least busy RUNNING worker ["<<min_index<<"]" << std::endl;
       send_request_to_worker(worker_info_map[min_index].worker_handle, req);
+
+      return min_index;
     }
-    void handleWorkResp(string cmd, const Response_msg& resp){
+    void handleWorkResp(string cmd, int index){
       int job_type =COMPUTE;
       if(cmd.compare("projectidea")==0)
         job_type=PROJECTIDEA;
       else if(cmd.compare("tellmenow")==0)
         job_type=TELLMENOW;
-      int index = resp.get_tag();
       updateWorkerJobs(job_type,index,-1);
     }
 };
@@ -270,14 +273,16 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
 
 
   string cmd = mstate.client_request_map[resp.get_tag()].request_msg.get_arg("cmd");
+  int worker_index = mstate.client_request_map[resp.get_tag()].worker_index;
+
+  //update number of jobs in work info
+  mstate.worker_metrics.handleWorkResp(cmd, worker_index);
+
 
   //remove itself from the queue
   if(!mstate.client_request_map.empty()){
     mstate.client_request_map.erase(resp.get_tag());
   }
-
-  //update number of jobs in work info
-  mstate.worker_metrics.handleWorkResp(cmd, resp);
 }
 
 void handle_client_request(Client_handle client_handle, const Request_msg& client_req) {
@@ -303,14 +308,15 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   client_request.request_msg = worker_req;
   client_request.waiting_client = client_handle;
 
-  mstate.client_request_map[tag] = client_request;
+
 
   //send to worker now
   //now send based on MOD value. Actually, in the future, this could be done through
   //DLOG(INFO) << "You are the only item in the Queue! process directly" << client_req.get_request_string() << std::endl;
 
-  mstate.worker_metrics.sendWork(worker_req);
-  //send_request_to_worker(mstate.worker_map[tag % mstate.num_wokers], worker_req);
+  client_request.worker_index = mstate.worker_metrics.sendWork(worker_req);
+
+  mstate.client_request_map[tag] = client_request;
 }
 
 void handle_tick() {
