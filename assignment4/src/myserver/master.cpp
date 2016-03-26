@@ -85,7 +85,9 @@ class Worker_metrics{
           result = max_num_workers-running+booting;
         }
         DLOG(INFO) << "Scale OUT on projectidea ["<<result<<"]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request <<", total projectidea="<<total_projectidea<< std::endl;
-        return result;
+        if(result!=0) {
+          return result;
+        }
       }
 
       //DLOG(INFO) << "Get Scale Number: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
@@ -98,7 +100,7 @@ class Worker_metrics{
         if(result+running+booting>max_num_workers)
           result=max_num_workers-running-booting;
 
-        DLOG(INFO) << "Scale OUT ["<<result<<"]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
+        DLOG(INFO) << "Scale OUT ["<<result<<"]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request<<", total projectidea="<<total_projectidea << std::endl;
         return result;
 
       } else {
@@ -176,6 +178,7 @@ class Worker_metrics{
       if(job_type==COMPUTE){
         worker_info_map[index].compute_jobs+=amount;
       }else if (job_type==PROJECTIDEA){
+        DLOG(INFO) << "Job type is  PROJECTIDEA!" << std::endl;
         worker_info_map[index].projectidea_jobs+=amount;
       }else{//tell me now
         worker_info_map[index].tellmenow_jobs+=amount;
@@ -185,8 +188,9 @@ class Worker_metrics{
       int min_index=-1;
       int min_count=800;
       int job_type =COMPUTE;
-      if(req.get_arg("cmd").compare("projectidea")==0)
-        job_type=PROJECTIDEA;
+      if(req.get_arg("cmd").compare("projectidea")==0) {
+        job_type = PROJECTIDEA;
+      }
       else if(req.get_arg("cmd").compare("tellmenow")==0)
         job_type=TELLMENOW;
 
