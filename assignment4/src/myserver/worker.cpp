@@ -19,10 +19,12 @@ using namespace std;
 
 #define MAX_THREAD 48  //define a number of queue, map workers to queues according to this number.
 #define WORK_QUEUE_NUM 4
+//0...NUM-1, is the queue of high computation jobs
+//NUM, is the queue of cache footprint job
 
 static struct Worker_state {
-  mutex mutexes[WORK_QUEUE_NUM];
-  condition_variable cv[WORK_QUEUE_NUM];
+  mutex mutexes[WORK_QUEUE_NUM+1];
+  condition_variable cv[WORK_QUEUE_NUM+1];
   map<int, queue<Request_msg>> qid_req_map;
   //pthread_t pthreads[MAX_THREAD];
 } worker_state;
@@ -68,18 +70,20 @@ void process_queue(int qid){
 //void *process_queue(void* arg){
   while(1) {
     //int qid = *(int*) arg;
-    //DLOG(INFO) << this_thread::get_id() << " Worker waiting on lock queue [" << qid << "] \n";
+
+    DLOG(INFO) << this_thread::get_id() << " Worker waiting on lock queue [" << qid << "] \n";
     unique_lock <mutex> lck(worker_state.mutexes[qid]);
     while (worker_state.qid_req_map[qid].empty()) {
-      //DLOG(INFO) << this_thread::get_id() << " Worker waiting on empty queue [" << qid << "] \n";
+      DLOG(INFO) << this_thread::get_id() << " Worker waiting on empty queue [" << qid << "] \n";
       worker_state.cv[qid].wait(lck);
     }
-    //queue <Request_msg> req_q = worker_state.qid_req_map[qid];
+    queue <Request_msg> req_q = worker_state.qid_req_map[qid];
     Request_msg req = worker_state.qid_req_map[qid].front();
     worker_state.qid_req_map[qid].pop();
-    //DLOG(INFO) << this_thread::get_id() << " Worker pop tag [" << req.get_tag() << "] from queue ["<< qid<<"]\n";
+    DLOG(INFO) << this_thread::get_id() << " Worker pop tag [" << req.get_tag() << "] from queue ["<< qid<<"]\n";
 
     lck.unlock();
+
 
     // Make the tag of the reponse match the tag of the request.  This
     // is a way for your master to match worker responses to requests.
@@ -126,9 +130,8 @@ void worker_node_init(const Request_msg& params) {
 
   DLOG(INFO) << "**** Initializing worker: " << params.get_arg("name") << " ****\n";
 
-  //launch Threads
-
-  for(int i = 0; i< MAX_THREAD; i++){
+  //launch 47 Threads
+  for(int i = 0; i< MAX_THREAD-1; i++){
     DLOG(INFO) << "spawn " << i << "th thread !!\n";
     int idx = i % WORK_QUEUE_NUM;
     thread t(process_queue, idx);
@@ -137,6 +140,12 @@ void worker_node_init(const Request_msg& params) {
     //pthread_detach(worker_state.pthreads[i]);
     //worker_state.threads[i]=t;
   }
+
+  //cache foot print
+  DLOG(INFO) << "spawn " << MAX_THREAD-1 << "th thread for cache foot print!!\n";
+  thread t(process_queue, WORK_QUEUE_NUM);
+  t.detach();
+
   DLOG(INFO) << "**** Initialized worker: " << params.get_arg("name") << " !!\n";
 
 }
@@ -144,8 +153,13 @@ void worker_node_init(const Request_msg& params) {
 void worker_handle_request(const Request_msg& req) {
   //add to queue
   int idx = req.get_tag() % WORK_QUEUE_NUM;
+  if(req.get_arg("cmd").compare("projectidea")==0){
+      idx = WORK_QUEUE_NUM;
+  }
+
   DLOG(INFO) << "add tag=" << req.get_tag() << " to queue="<<idx<<", queue size= "<<worker_state.qid_req_map[idx].size()<<" !\n";
   lock_guard<mutex> lck(worker_state.mutexes[idx]);
   worker_state.qid_req_map[idx].push(req);
   worker_state.cv[idx].notify_one();
 }
+
