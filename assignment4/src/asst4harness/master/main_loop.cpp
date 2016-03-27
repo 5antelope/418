@@ -86,11 +86,11 @@ static void accumulate_time(Worker_handle worker_handle) {
 }
 
 void kill_worker_node(Worker_handle worker_handle) {
-
   CHECK_EQ(workers.erase(worker_handle), 1U) << "Attempt to kill non worker";
   close_connection(worker_handle);
   accumulate_time(worker_handle);
   worker_boot_times.erase(worker_handle);
+  DLOG(INFO) << "### KILL WORKER NODE COMPLETE" << std::endl;
 }
 
 void send_request_to_worker(Client_handle worker_handle, const Request_msg& job) {

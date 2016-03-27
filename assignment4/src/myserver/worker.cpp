@@ -151,11 +151,11 @@ void worker_handle_request(const Request_msg& req) {
 
   string cmd = req.get_arg("cmd");
 
-  if (cmd.compare("cachefootprint_job") == 0) {
+  if (cmd.compare("projectidea") == 0) {
 
     // put cache footprint request to its own queue
     request_queue_footprint.put_work(req);
-    
+
   }
   else {
 
