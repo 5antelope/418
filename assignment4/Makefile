@@ -61,7 +61,7 @@ ifneq ($(strip $(LIBS_NOTFOUND)),)
 endif
 
 CXX=g++
-CXXFLAGS+=-Wall -Wextra -O2 -std=c++11
+CXXFLAGS+=-Wall -Wextra -O2 -std=c++11 -g
 CPPFLAGS+=-I$(CURDIR)/src/asst4harness -I$(CURDIR)/src/asst4include $(foreach lib,$(LIBS), $(shell $(PKGCONFIG) --cflags $(lib)))
 LDFLAGS+=-lpthread $(foreach lib,$(LIBS), $(shell $(PKGCONFIG) --libs $(lib))) -Xlinker -rpath -Xlinker external_lib
 
@@ -89,3 +89,5 @@ clean:
 cleanlogs:
 	rm -rf $(LOGDIR) latedays.qsub.*
 
+cleanall:
+	rm -rf $(OBJDIR) $(DEPDIR) $(LOGDIR) master worker *.pyc
