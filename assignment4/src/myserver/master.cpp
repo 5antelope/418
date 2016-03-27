@@ -33,6 +33,14 @@ typedef struct {
 
 } Worker_meta;
 
+typedef struct {
+  int tag;
+  int count;
+
+  int arg[4];
+
+} Prime_info;
+
 static struct Master_state {
 
   // The mstate struct collects all the master node state into one
@@ -54,6 +62,8 @@ static struct Master_state {
   // Client_handle waiting_client;
   map<int, Client_handle> client_map;
 
+  map<int, Request_msg> request_map;
+
   // map worker to corresponding meta data
   map<Worker_handle, Worker_meta> worker_map;
 
@@ -61,6 +71,14 @@ static struct Master_state {
   // 0: cache footprint
   // 1: othres
   map<int, int> request_type;
+
+  // cache for prime
+  map<int, int> prime_cache;
+  // map tag to prime job information
+  map<int, Prime_info> prime_map;
+
+  // cache for others
+  map<string, string> normal_cache;
 
 } mstate;
 
@@ -138,12 +156,6 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
   // Master node has received a response from one of its workers.
   // Here we directly return this response to the client.
 
-  // TODO:
-  // 1) get meta data from worker_map, 
-  // 2) update num_pending_requests, num_footprint_requests and latest_latency
-  // 3) send out response
-
-
   DLOG(INFO) << "Master received a response from a worker: [" << resp.get_tag() << ":" << resp.get_response() << "]" << std::endl;
 
   int tag = resp.get_tag();
@@ -156,6 +168,22 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
   // add a free worker to queue to use
   mstate.num_pending_client_requests--;
 
+  Request_msg req = mstate.request_map[tag].request_msg;
+  
+  string value = resp.get_response();
+
+  if (mstate.prime_map.find(tag) != mstate.prime_map.end()) {
+    // request is compare prime request
+    Prime_info prime_info = mstate.prime_map[tag];
+
+    prime_info.count++;
+
+    // put response to cache
+    int n = atoi(req.get_arg("n").c_str());
+    
+    prime_cache[n] = atoi(value.c_str);
+  }
+
   // decrease the worker_count in meta data
   Worker_meta meta = mstate.worker_map[worker_handle];
   if (mstate.request_type[tag] == 0) {
@@ -167,6 +195,7 @@ void handle_worker_response(Worker_handle worker_handle, const Response_msg& res
     meta.num_pending_requests--;
   }
 
+  mstate.normal_cache[req.get_arg("x")] = value;
 }
 
 void handle_client_request(Client_handle client_handle, const Request_msg& client_req) {
@@ -176,12 +205,6 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // You can assume that traces end with this special message.  It
   // exists because it might be useful for debugging to dump
   // information about the entire run here: statistics, etc.
-
-  // TODO:
-  // save request type in request_type map
-  // check request type, and send it to the worker with smallest corresponding counts
-  // update worker's num_pending_requests/num_footprint_requests
-  // send request to worker
 
   if (client_req.get_arg("cmd") == "lastrequest") {
     Response_msg resp(0);
@@ -198,21 +221,41 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
   // The master needs to do this it can response to this client later
   // when 'handle_worker_response' is called.
 
-  // mstate.waiting_client = client_handle;
   mstate.num_pending_client_requests++;
 
   // Fire off the request to the worker.  Eventually the worker will
   // respond, and your 'handle_worker_response' event handler will be
   // called to forward the worker's response back to the server.
 
+  string cmd = client_req.get_arg("cmd");
+
+  if (cmd.compare("compareprimes") == 0) {
+    // handle compareprimes by 4 separate requests
+    execute_compareprimes(client_req, client_handle);
+
+    return;
+  }
+
+  // check cache first
+  string result ="";
+  if (check_cache(client_req, result)) {
+    DLOG(INFO) << "; Cache hit";
+
+    Response_msg dummy_resp(0);
+    dummy_resp.set_response(result);
+
+    send_client_response(client_handle, dummy_resp);
+
+    return;
+  }
+  
   // create tag-client map
   int tag = mstate.next_tag++;
   mstate.client_map.insert ( std::pair<int, Client_handle>(tag, client_handle) );
-
-  string cmd = client_req.get_arg("cmd");
+  mstate.request_map[tag] = client_req;
 
   // remember type of request by tags
-  if (cmd.compare("cachefootprint_job") == 0)
+  if (cmd.compare("projectidea") == 0)
     mstate.request_type[tag] = 0;
   else
     mstate.request_type[tag] = 1;
@@ -231,6 +274,58 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
 
 }
 
+bool check_cache(Request_msg req, string &result) {
+
+  string cmd = req.get_arg("cmd");
+
+  if (mstate.normal_cache.find(req.get_arg("x")) != mstate.tellmenow_cache.end()) {
+    result = mstate.tellmenow_cache[req.get_arg("x")];
+    return true;
+  }
+
+  return false;
+
+}
+
+void create_computeprimes_req(Request_msg& req, int n) {
+  std::ostringstream oss;
+  oss << n;
+  req.set_arg("cmd", "countprimes");
+  req.set_arg("n", oss.str());
+}
+
+void execute_compareprimes(const Request_msg& req, const Client_handle& client) {
+
+    int params[4];
+
+    // grab the four arguments defining the two ranges
+    params[0] = atoi(req.get_arg("n1").c_str());
+    params[1] = atoi(req.get_arg("n2").c_str());
+    params[2] = atoi(req.get_arg("n3").c_str());
+    params[3] = atoi(req.get_arg("n4").c_str());
+
+    Prime_info prime_info;
+
+    int tag = mstate.next_tag++;
+    prime_info.tag = tag;
+
+    for (int i = 0; i< 4; i++) {
+      Request_msg dummy_req(tag + i);
+      mstate.prime_map[tag + i] = prime_info;
+
+      create_computeprimes_req(dummy_req, params[i]);
+
+      if (mstate.prime_cache.find(params[i]) == mstate.prime_cache.end()) {
+        // not found
+        Worker_handle worker = pick_idle_woker(dummy_req.get_arg("cmd"));
+        send_request_to_worker(worker, dummy_req);
+      }
+    }
+
+    mstate.client_map[tag] = client;
+
+}
+
 Worker_handle pick_idle_woker(string cmd) {
 
   Worker_handle worker = NULL;
@@ -240,7 +335,7 @@ Worker_handle pick_idle_woker(string cmd) {
 
     Worker_handle tmp = *it;
 
-    if (cmd.compare("cachefootprint_job") == 0 && mstate.worker_map[tmp].num_footprint_requests < min)
+    if (cmd.compare("projectidea") == 0 && mstate.worker_map[tmp].num_footprint_requests < min)
       worker = tmp;
     else if (mstate.worker_map[tmp].num_pending_requests < min)
       worker = tmp;
@@ -280,7 +375,6 @@ void elastic_check() {
     }
   
   }
-
 }
 
 void check_and_kill() {

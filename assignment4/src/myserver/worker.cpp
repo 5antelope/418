@@ -203,8 +203,8 @@ void worker_process_request(const Request_msg& req) {
     // built on four calls to execute_execute work.  All other
     // requests from the client are one-to-one with calls to
     // execute_work.
-
-    execute_compareprimes(req, resp);
+    DLOG(INFO) << "Should NOT be here: Check compareprimes.";
+    // execute_compareprimes(req, resp);
 
   } else {
 
