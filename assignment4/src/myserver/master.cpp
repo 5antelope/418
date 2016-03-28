@@ -13,9 +13,9 @@
 #define BOOTING_CLOSING 4
 
 #define SCALE_OUT_THRESHOLD 38  // request per node > 36, scale out
-#define SCALE_IN_THRESHOLD 37   // if scale in by one,   request per node <=32, then scale in
+#define SCALE_IN_THRESHOLD 37    // if scale in by one,   request per node <=32, then scale in
 
-#define PROJECTIDEA_THRESHOLD
+#define MAX_JOBS 48  //no more than 48 jobs should a worker process at the same time.
 
 //job type
 #define COMPUTE 0
@@ -79,14 +79,18 @@ class Worker_metrics{
       }
 
       //scale for projectidea
-      if(total_projectidea>=running+booting){
-        int result =  total_projectidea-(running+booting);
-        if(result+running+booting>max_num_workers){
-          result = max_num_workers-running+booting;
-        }
-        DLOG(INFO) << "Scale OUT on projectidea ["<<result<<"]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request <<", total projectidea="<<total_projectidea<< std::endl;
-        if(result!=0) {
-          return result;
+      if(total_projectidea>0) {
+        if (total_projectidea >= running + booting) {
+          int result = total_projectidea - (running + booting);
+          if (result + running + booting > max_num_workers) {
+            result = max_num_workers - running + booting;
+          }
+          DLOG(INFO) << "Scale OUT on projectidea [" << result << "]: running=" << running << ", booting=" << booting <<
+          ", closing=" << closing << ", total request=" << total_request << ", total projectidea=" <<
+          total_projectidea << std::endl;
+          if (result != 0) {
+            return result;
+          }
         }
       }
 
@@ -106,8 +110,14 @@ class Worker_metrics{
       } else {
         if((running+booting-1)==0)
           return 0;
+        else if (total_projectidea == (running + booting)){
+          return 0;
+        }
+        else if(total_projectidea == (running + booting)-1){
+          return 0;
+        }
         else if(total_request/(running+booting-1)<=SCALE_IN_THRESHOLD) {
-          DLOG(INFO) << "Scale IN [1]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << std::endl;
+          DLOG(INFO) << "Scale IN [1]: running="<<running <<", booting="<<booting<<", closing="<<closing<<", total request="<<total_request << ", total projectidea="<<total_projectidea<< std::endl;
           return -1;
         }
         return 0;
@@ -178,7 +188,7 @@ class Worker_metrics{
       if(job_type==COMPUTE){
         worker_info_map[index].compute_jobs+=amount;
       }else if (job_type==PROJECTIDEA){
-        DLOG(INFO) << "Job type is  PROJECTIDEA!" << std::endl;
+        //DLOG(INFO) << "Job type is  PROJECTIDEA!" << std::endl;
         worker_info_map[index].projectidea_jobs+=amount;
       }else{//tell me now
         worker_info_map[index].tellmenow_jobs+=amount;
@@ -229,6 +239,16 @@ class Worker_metrics{
       else if(cmd.compare("tellmenow")==0)
         job_type=TELLMENOW;
       updateWorkerJobs(job_type,index,-1);
+    }
+
+    void printInfo(){
+      //print all worker's info
+      for(int i = 0; i< max_num_workers; i++){
+        DLOG(INFO) << "TICK: worker ["<<i<<"]: status="<<worker_info_map[i].status
+        <<", compute_jobs="<<worker_info_map[i].compute_jobs
+        <<", tellmenow_jobs="<<worker_info_map[i].tellmenow_jobs
+        <<", projectidea_jobs="<<worker_info_map[i].projectidea_jobs << std::endl;
+      }
     }
 };
 
@@ -309,7 +329,7 @@ void master_node_init(int max_workers, int& tick_period) {
 
   // set up tick handler to fire every 5 seconds. (feel free to
   // configure as you please)
-  tick_period = 1;
+  tick_period = 2;
 
   mstate.next_tag = 0;
   mstate.max_num_workers = max_workers;
@@ -503,6 +523,8 @@ void handle_client_request(Client_handle client_handle, const Request_msg& clien
 
 void handle_tick() {
   if(mstate.server_ready) {
+    //mstate.worker_metrics.printInfo();
+
     //DLOG(INFO) << "TICK!" << std::endl;
     int scale_number = mstate.worker_metrics.getScaleNumber();
     //DLOG(INFO) << "Scale Number "<< scale_number << std::endl;
@@ -514,7 +536,7 @@ void handle_tick() {
       mstate.worker_metrics.scaleIn(-1 * scale_number);
     }
     mstate.worker_metrics.actualShutDown();
-    //DLOG(INFO) << "TICKed!" << std::endl;
+
   }
 }
 
