@@ -15,7 +15,7 @@
 #define SCALE_OUT_THRESHOLD 38  // request per node > 36, scale out
 #define SCALE_IN_THRESHOLD 37    // if scale in by one,   request per node <=32, then scale in
 
-#define MAX_JOBS 48  //no more than 48 jobs should a worker process at the same time.
+#define TICK 2
 
 //job type
 #define COMPUTE 0
@@ -329,7 +329,7 @@ void master_node_init(int max_workers, int& tick_period) {
 
   // set up tick handler to fire every 5 seconds. (feel free to
   // configure as you please)
-  tick_period = 2;
+  tick_period = TICK;
 
   mstate.next_tag = 0;
   mstate.max_num_workers = max_workers;
